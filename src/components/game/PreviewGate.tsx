@@ -37,11 +37,13 @@ function Headphones() {
 export function PreviewGate({
   song,
   onClose,
+  autoPlay = false,
 }: {
   song: Song;
   onClose: () => void;
+  autoPlay?: boolean;
 }) {
-  const [phase, setPhase] = useState<Phase>("warning");
+  const [phase, setPhase] = useState<Phase>(autoPlay ? "loading" : "warning");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -51,9 +53,14 @@ export function PreviewGate({
     };
   }, []);
 
-  async function play() {
-    setPhase("loading");
+  useEffect(() => {
+    if (autoPlay) {
+      void play();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay]);
 
+  async function play() {
     try {
       const { previewUrl } = await api.preview(song.artist, song.title);
 
@@ -80,18 +87,27 @@ export function PreviewGate({
         className="bg-paper stroke-hard w-full max-w-sm rounded-3xl p-5 text-center shadow-[0_12px_0_var(--color-grape)]"
         style={{ animation: "bounce-in 0.45s both" }}
       >
-        <Headphones />
+        {autoPlay ? null : <Headphones />}
 
         <h2 className="font-display text-coral mt-3 text-3xl uppercase leading-none">
-          {copy.preview.warningTitle}
+          {autoPlay ? song.title : copy.preview.warningTitle}
         </h2>
 
-        {phase === "playing" ? (
+        {phase === "loading" && autoPlay ? (
+          <p className="mt-3 text-sm font-bold leading-snug">Procurando...</p>
+        ) : phase === "playing" ? (
           <>
             <p className="mt-3 text-sm font-bold leading-snug">
-              Tocando um pedaço de{" "}
-              <strong className="font-display font-normal">{song.title}</strong>
-              .
+              {autoPlay ? song.artist : null}
+              {autoPlay ? null : (
+                <>
+                  Tocando um pedaço de{" "}
+                  <strong className="font-display font-normal">
+                    {song.title}
+                  </strong>
+                  .
+                </>
+              )}
             </p>
             <div className="mt-4">
               <Button
@@ -128,7 +144,10 @@ export function PreviewGate({
               <Button
                 color="mint"
                 disabled={phase === "loading"}
-                onClick={play}
+                onClick={() => {
+                  setPhase("loading");
+                  void play();
+                }}
               >
                 {phase === "loading" ? "Procurando..." : copy.preview.confirm}
               </Button>

@@ -311,7 +311,10 @@ export function OnlineTurnScreen({
                         <div className="flex w-full items-center gap-2">
                           <button
                             type="button"
-                            onClick={recorder.stop}
+                            onClick={() => {
+                              playSound("tap");
+                              recorder.stop();
+                            }}
                             className="bg-coral stroke-hard font-display text-paper flex-1 rounded-lg px-2 py-2 text-sm uppercase"
                             style={{ animation: "pulse-record 1s infinite" }}
                           >
@@ -332,7 +335,10 @@ export function OnlineTurnScreen({
                             <button
                               type="button"
                               disabled={busy}
-                              onClick={sendTake}
+                              onClick={() => {
+                                playSound("tap");
+                                void sendTake();
+                              }}
                               className="font-display bg-mint text-paper stroke-thin flex-1 rounded-lg px-2 py-2 text-sm uppercase disabled:opacity-50"
                             >
                               {busy ? "Mandando" : "Mandar"}
@@ -341,6 +347,7 @@ export function OnlineTurnScreen({
                               type="button"
                               disabled={busy}
                               onClick={() => {
+                                playSound("tap");
                                 recorder.reset();
                                 setTarget(null);
                               }}
@@ -356,6 +363,7 @@ export function OnlineTurnScreen({
                             type="button"
                             disabled={alreadySent || otherBusy}
                             onClick={() => {
+                              playSound("card");
                               setTarget(row.songId);
                               void recorder.start();
                             }}
@@ -368,7 +376,10 @@ export function OnlineTurnScreen({
                           {row.song ? (
                             <button
                               type="button"
-                              onClick={() => setPreview(row.song)}
+                              onClick={() => {
+                                playSound("tap");
+                                setPreview(row.song);
+                              }}
                               aria-label={`${copy.preview.button}: ${row.song.title}`}
                               className="font-display bg-gold text-grape stroke-thin rounded-lg px-2.5 py-1.5 text-sm uppercase"
                             >
@@ -386,6 +397,7 @@ export function OnlineTurnScreen({
 
           <Button
             size="sm"
+            className="max-w-sm"
             color="grape"
             disabled={busy || sentSongIds.size === 0}
             onClick={() =>
@@ -445,6 +457,7 @@ export function OnlineTurnScreen({
           <TakeList takes={takes} canGuess={false} busy={busy} onGuess={guess} />
           <Button
             size="sm"
+            className="max-w-sm"
             color="grape"
             disabled={busy}
             onClick={() =>
@@ -501,7 +514,11 @@ export function OnlineTurnScreen({
       ) : null}
 
       {preview ? (
-        <PreviewGate song={preview} onClose={() => setPreview(null)} />
+        <PreviewGate
+          song={preview}
+          autoPlay
+          onClose={() => setPreview(null)}
+        />
       ) : null}
     </main>
   );
