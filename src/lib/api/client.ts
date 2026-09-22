@@ -10,6 +10,8 @@ import type {
   Team,
   TurnRow,
   Twist,
+  ChatMessage,
+  ReactionTally,
 } from "@/types/game";
 
 export type PlayMode = "local" | "online";
@@ -40,6 +42,8 @@ export interface TakeView {
   seconds: number;
   solved: boolean;
   solvedByName: string | null;
+  reactions: ReactionTally[];
+  myReaction: string | null;
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -132,6 +136,56 @@ export const api = {
 
   closeTurn(code: string, token: string) {
     return turn(code, token, "close");
+  },
+
+  chat(code: string, token: string) {
+    return request<{ messages: ChatMessage[] }>(
+      `/api/room/chat?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`,
+    );
+  },
+
+  sendChatText(code: string, token: string, body: string) {
+    return request<{ message: ChatMessage }>("/api/room/chat", {
+      method: "POST",
+      body: JSON.stringify({ code, token, body }),
+    });
+  },
+
+  async sendChatAudio(
+    code: string,
+    token: string,
+    blob: Blob,
+    seconds: number,
+  ) {
+    const form = new FormData();
+
+    form.append("code", code);
+    form.append("token", token);
+    form.append("seconds", String(seconds));
+    form.append("file", blob, `chat.${blob.type.split("/")[1] ?? "webm"}`);
+
+    const response = await fetch("/api/room/chat", {
+      method: "POST",
+      body: form,
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as {
+      message: ChatMessage;
+      error?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Deu ruim aqui. Tente de novo.");
+    }
+
+    return payload;
+  },
+
+  react(code: string, token: string, takeId: string, emoji: string) {
+    return request<{ emoji: string | null }>("/api/room/react", {
+      method: "POST",
+      body: JSON.stringify({ code, token, takeId, emoji }),
+    });
   },
 
   endSteal(code: string, token: string) {

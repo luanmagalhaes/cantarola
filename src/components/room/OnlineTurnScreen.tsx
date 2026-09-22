@@ -173,6 +173,13 @@ export function OnlineTurnScreen({
     });
   }
 
+  function react(takeId: string, emoji: string) {
+    void dispatch(async () => {
+      await api.react(room.code, token, takeId, emoji);
+      await loadTakes();
+    });
+  }
+
   function guess(takeId: string, body: string) {
     void dispatch(async () => {
       const answer = await api.guess(room.code, token, takeId, body);
@@ -448,6 +455,8 @@ export function OnlineTurnScreen({
             busy={busy}
             onGuess={guess}
             feedback={feedback}
+            canReact
+            onReact={react}
           />
         </>
       ) : null}

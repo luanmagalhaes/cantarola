@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ReactionBar } from "@/components/room/ReactionBar";
 import type { TakeView } from "@/lib/api/client";
 
 export interface GuessFeedback {
@@ -15,12 +16,16 @@ export function TakeList({
   busy,
   onGuess,
   feedback,
+  canReact = false,
+  onReact,
 }: {
   takes: TakeView[];
   canGuess: boolean;
   busy: boolean;
   onGuess: (takeId: string, body: string) => void;
   feedback?: GuessFeedback | null;
+  canReact?: boolean;
+  onReact?: (takeId: string, emoji: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -72,6 +77,13 @@ export function TakeList({
               controls
               preload="none"
               className="mt-2 w-full"
+            />
+
+            <ReactionBar
+              reactions={take.reactions}
+              mine={take.myReaction}
+              canReact={canReact && Boolean(onReact)}
+              onReact={(emoji) => onReact?.(take.id, emoji)}
             />
 
             {take.solved ? (

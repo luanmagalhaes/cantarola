@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { HowToPlay } from "@/components/game/HowToPlay";
+import { ChatBubble } from "@/components/room/ChatBubble";
 import { LeaveButton } from "@/components/room/LeaveButton";
 import { LobbyScreen } from "@/components/room/LobbyScreen";
 import { LocalTurnScreen } from "@/components/room/LocalTurnScreen";
@@ -92,6 +93,9 @@ export function RoomApp({ code }: { code: string }) {
     <>
       <SoundToggle />
       <LeaveButton />
+      {online ? (
+        <ChatBubble code={code} token={token} myId={state.me.id} />
+      ) : null}
 
       {state.room.status === "lobby" ? (
         <LobbyScreen

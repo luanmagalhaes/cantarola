@@ -107,3 +107,19 @@ export interface RankingRow {
   matches: number;
   points: number;
 }
+
+export interface ChatMessage {
+  id: string;
+  player_id: string | null;
+  author_name: string;
+  kind: "text" | "audio";
+  body: string | null;
+  audio_url: string | null;
+  audio_seconds: number | null;
+  created_at: string;
+}
+
+export interface ReactionTally {
+  emoji: string;
+  count: number;
+}
