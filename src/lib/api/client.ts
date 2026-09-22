@@ -181,6 +181,37 @@ export const api = {
     return payload;
   },
 
+  setEmoji(code: string, token: string, emoji: string) {
+    return request<{ emoji: string }>("/api/room/profile", {
+      method: "POST",
+      body: JSON.stringify({ code, token, emoji }),
+    });
+  },
+
+  async setPhoto(code: string, token: string, blob: Blob) {
+    const form = new FormData();
+
+    form.append("code", code);
+    form.append("token", token);
+    form.append("file", blob, "avatar.jpg");
+
+    const response = await fetch("/api/room/avatar", {
+      method: "POST",
+      body: form,
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as {
+      avatar: string;
+      error?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Deu ruim aqui. Tente de novo.");
+    }
+
+    return payload;
+  },
+
   react(code: string, token: string, takeId: string, emoji: string) {
     return request<{ emoji: string | null }>("/api/room/react", {
       method: "POST",

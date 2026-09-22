@@ -32,6 +32,8 @@ function player(overrides: Partial<PlayerRow> = {}): PlayerRow {
     is_host: false,
     spoke_count: 0,
     seat,
+    avatar: null,
+    emoji: null,
     ...overrides,
   };
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { randomFace } from "@/data/faces";
 import { ServiceError, messageFor } from "@/lib/messages";
 import { serverClient } from "@/lib/supabase/server";
 import { songById, songsFor } from "@/data/songs";
@@ -101,6 +102,7 @@ export async function createRoom(input: {
       room_id: (room as RoomRow).id,
       name,
       team: null,
+      emoji: randomFace(),
       is_host: true,
       seat: 0,
     })
@@ -141,7 +143,13 @@ export async function joinRoom(code: string, rawName: string) {
 
   const { data: player } = await serverClient()
     .from("ll_players")
-    .insert({ room_id: room.id, name, team: null, seat: count ?? 0 })
+    .insert({
+      room_id: room.id,
+      name,
+      team: null,
+      seat: count ?? 0,
+      emoji: randomFace(await facesTaken(room.id)),
+    })
     .select("*")
     .single();
 
@@ -152,6 +160,17 @@ export async function joinRoom(code: string, rawName: string) {
   const token = await createSecret((player as PlayerRow).id);
 
   return { code: room.code, token, playerId: (player as PlayerRow).id };
+}
+
+async function facesTaken(roomId: string): Promise<string[]> {
+  const { data } = await serverClient()
+    .from("ll_players")
+    .select("emoji")
+    .eq("room_id", roomId);
+
+  return ((data as { emoji: string | null }[] | null) ?? [])
+    .map((row) => row.emoji)
+    .filter((emoji): emoji is string => Boolean(emoji));
 }
 
 export async function roomByCode(code: string): Promise<RoomRow> {

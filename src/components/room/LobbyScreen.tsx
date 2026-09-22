@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { AvatarPicker } from "@/components/room/AvatarPicker";
+import { Avatar } from "@/components/ui/Avatar";
 import { TeamDraw } from "@/components/room/TeamDraw";
 import { api, type RoomState } from "@/lib/api/client";
 import { deckSizes } from "@/data/songs";
@@ -21,10 +23,12 @@ export function LobbyScreen({
   state,
   token,
   onHelp,
+  onRefresh,
 }: {
   state: RoomState;
   token: string;
   onHelp: () => void;
+  onRefresh: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -103,6 +107,13 @@ export function LobbyScreen({
         </span>
       </button>
 
+      <AvatarPicker
+        code={room.code}
+        token={token}
+        me={state.me}
+        onDone={onRefresh}
+      />
+
       {alreadyDrawn ? (
         <section className="w-full max-w-sm">
           <h2 className="font-display text-grape mb-2 text-lg uppercase">
@@ -134,10 +145,18 @@ export function LobbyScreen({
                       squad.map((player) => (
                         <li
                           key={player.id}
-                          className="bg-paper stroke-thin font-display rounded-lg px-2 py-1.5 text-center text-sm uppercase leading-none"
+                          className="bg-paper stroke-thin font-display flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm uppercase leading-none"
                         >
-                          {player.name}
-                          {player.is_host ? " ★" : ""}
+                          <Avatar
+                            name={player.name}
+                            photo={player.avatar}
+                            emoji={player.emoji}
+                            size="sm"
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {player.name}
+                            {player.is_host ? " ★" : ""}
+                          </span>
                         </li>
                       ))
                     )}
@@ -170,9 +189,15 @@ export function LobbyScreen({
               {players.map((player) => (
                 <li
                   key={player.id}
-                  className="bg-lemon stroke-thin font-display rounded-lg px-2 py-1 text-sm uppercase"
+                  className="bg-lemon stroke-thin font-display flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm uppercase"
                   style={{ animation: "rise-in 0.35s both" }}
                 >
+                  <Avatar
+                    name={player.name}
+                    photo={player.avatar}
+                    emoji={player.emoji}
+                    size="sm"
+                  />
                   {player.name}
                   {player.is_host ? " ★" : ""}
                 </li>

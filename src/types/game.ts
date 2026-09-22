@@ -30,6 +30,8 @@ export interface PlayerRow {
   is_host: boolean;
   spoke_count: number;
   seat: number;
+  avatar: string | null;
+  emoji: string | null;
 }
 
 export interface RoomRow {

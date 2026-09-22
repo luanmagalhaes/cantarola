@@ -102,6 +102,7 @@ export function RoomApp({ code }: { code: string }) {
           state={state}
           token={token}
           onHelp={() => setTutorial(true)}
+          onRefresh={refresh}
         />
       ) : null}
 
