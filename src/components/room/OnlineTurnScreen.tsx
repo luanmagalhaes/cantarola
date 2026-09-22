@@ -278,111 +278,92 @@ export function OnlineTurnScreen({
         <>
           <div className="bg-grape w-full max-w-sm rounded-2xl px-4 py-3 text-center">
             <p className="font-display text-lemon text-lg uppercase leading-tight">
-              {target
-                ? "Grave o cantarolo dessa música"
-                : "Escolha qual música vai cantarolar"}
+              Aperte o vermelho e cantarole
             </p>
-            {recorder.status === "blocked" ? (
-              <p className="text-paper mt-1 text-xs font-bold leading-snug">
-                {copy.errors.noMicrophone}
-              </p>
-            ) : null}
+            <p className="text-paper mt-1 text-xs font-bold leading-snug">
+              {recorder.status === "blocked"
+                ? copy.errors.noMicrophone
+                : "O ♪ toca um trecho pra você lembrar. Mande quantas der."}
+            </p>
           </div>
 
-          {target ? (
-            <div className="bg-paper stroke-hard hard-shadow flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl px-4 py-4">
-              <div className="bg-lemon stroke-hard w-full rounded-xl px-3 py-2 text-center">
-                <p className="font-display text-grape/60 text-[0.65rem] uppercase leading-none">
-                  Cantarolando
-                </p>
-                <p className="font-display text-grape mt-1 text-xl uppercase leading-tight">
-                  {songs.find((row) => row.songId === target)?.song?.title ??
-                    "essa música"}
-                </p>
-                <p className="text-grape/70 mt-0.5 text-xs font-bold leading-tight">
-                  {songs.find((row) => row.songId === target)?.song?.artist}
-                </p>
-              </div>
+          <ul className="flex w-full max-w-sm flex-col gap-2">
+            {songs.map((row, index) => {
+              const alreadySent = sentSongIds.has(row.songId);
+              const mine = target === row.songId;
+              const recording = mine && recorder.status === "recording";
+              const ready = mine && recorder.status === "ready" && recorder.take;
+              const otherBusy =
+                target !== null &&
+                !mine &&
+                (recorder.status === "recording" || recorder.status === "ready");
 
-              {recorder.status === "recording" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={recorder.stop}
-                    className="bg-coral stroke-hard font-display text-paper flex h-24 w-24 items-center justify-center rounded-full text-lg uppercase"
-                    style={{ animation: "pulse-record 1s infinite" }}
-                  >
-                    Parar
-                  </button>
-                  <p className="font-display text-grape text-2xl leading-none">
-                    {recorder.seconds}s
-                  </p>
-                </>
-              ) : recorder.status === "ready" && recorder.take ? (
-                <>
-                  <audio
-                    src={recorder.take.url}
-                    controls
-                    className="w-full"
-                  />
-                  <div className="flex w-full flex-col gap-2">
-                    <Button color="mint" disabled={busy} onClick={sendTake}>
-                      {busy ? "Mandando" : "Mandar"}
-                    </Button>
-                    <Button color="paper" disabled={busy} onClick={recorder.reset}>
-                      Regravar
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void recorder.start()}
-                    className="bg-coral stroke-hard font-display text-paper flex h-24 w-24 items-center justify-center rounded-full text-4xl"
-                    aria-label="Começar a gravar"
-                  >
-                    ●
-                  </button>
-                  <p className="font-display text-grape text-sm uppercase opacity-75">
-                    toque para gravar
-                  </p>
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  recorder.reset();
-                  setTarget(null);
-                }}
-                className="font-display text-grape text-xs uppercase underline"
-              >
-                Voltar pra lista
-              </button>
-            </div>
-          ) : (
-            <ul className="flex w-full max-w-sm flex-col gap-2">
-              {songs.map((row, index) => {
-                const alreadySent = sentSongIds.has(row.songId);
-
-                return (
-                  <SongCard
-                    key={row.songId}
-                    song={row.song}
-                    outcome={row.outcome}
-                    index={index}
-                    isBomb={turn.bomb_song_id === row.songId}
-                    actions={
-                      row.outcome === null ? (
+              return (
+                <SongCard
+                  key={row.songId}
+                  song={row.song}
+                  outcome={row.outcome}
+                  index={index}
+                  isBomb={turn.bomb_song_id === row.songId}
+                  actions={
+                    row.outcome === null ? (
+                      recording ? (
+                        <div className="flex w-full items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={recorder.stop}
+                            className="bg-coral stroke-hard font-display text-paper flex-1 rounded-lg px-2 py-2 text-sm uppercase"
+                            style={{ animation: "pulse-record 1s infinite" }}
+                          >
+                            Parar
+                          </button>
+                          <span className="font-display text-grape text-xl leading-none">
+                            {recorder.seconds}s
+                          </span>
+                        </div>
+                      ) : ready && recorder.take ? (
+                        <div className="flex w-full flex-col gap-2">
+                          <audio
+                            src={recorder.take.url}
+                            controls
+                            className="w-full"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={sendTake}
+                              className="font-display bg-mint text-paper stroke-thin flex-1 rounded-lg px-2 py-2 text-sm uppercase disabled:opacity-50"
+                            >
+                              {busy ? "Mandando" : "Mandar"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                recorder.reset();
+                                setTarget(null);
+                              }}
+                              className="font-display bg-paper text-grape stroke-thin rounded-lg px-3 py-2 text-sm uppercase disabled:opacity-50"
+                            >
+                              Regravar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                         <>
                           <button
                             type="button"
-                            disabled={alreadySent}
-                            onClick={() => setTarget(row.songId)}
-                            className="font-display bg-mint text-paper stroke-thin flex-1 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-40"
+                            disabled={alreadySent || otherBusy}
+                            onClick={() => {
+                              setTarget(row.songId);
+                              void recorder.start();
+                            }}
+                            aria-label={`Gravar ${row.song?.title ?? "essa música"}`}
+                            className="bg-coral stroke-thin font-display text-paper flex flex-1 items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-40"
                           >
-                            {alreadySent ? "Já mandei" : "Cantarolar essa"}
+                            <span className="text-base leading-none">●</span>
+                            {alreadySent ? "Já mandei" : "Gravar"}
                           </button>
                           {row.song ? (
                             <button
@@ -395,13 +376,13 @@ export function OnlineTurnScreen({
                             </button>
                           ) : null}
                         </>
-                      ) : null
-                    }
-                  />
-                );
-              })}
-            </ul>
-          )}
+                      )
+                    ) : null
+                  }
+                />
+              );
+            })}
+          </ul>
 
           <Button
             size="sm"
