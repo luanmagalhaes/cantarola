@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PreviewGate } from "@/components/game/PreviewGate";
 import { SongCard } from "@/components/game/SongCard";
 import { TurnHeader } from "@/components/game/TurnHeader";
-import { TakeList } from "@/components/room/TakeList";
+import { TakeList, type GuessFeedback } from "@/components/room/TakeList";
 import { Button } from "@/components/ui/Button";
 import { api, type RoomState, type TakeView } from "@/lib/api/client";
 import { copy } from "@/data/copy";
@@ -35,6 +35,7 @@ export function OnlineTurnScreen({
   const [preview, setPreview] = useState<Song | null>(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
+  const [feedback, setFeedback] = useState<GuessFeedback | null>(null);
   const [busy, setBusy] = useState(false);
   const lastResultId = useRef<string | null>(null);
   const closing = useRef(false);
@@ -178,13 +179,23 @@ export function OnlineTurnScreen({
 
       if (answer.correct && answer.song) {
         playSound("right");
-        setFlash(`Isso! Era ${answer.song.title}.`);
+        setFeedback({
+          takeId,
+          correct: true,
+          message: `Isso! Era ${answer.song.title}`,
+        });
+        setFlash(`Isso! Era ${answer.song.title}`);
+        setTimeout(() => setFlash(""), 3200);
       } else {
         playSound("miss");
-        setFlash("Não é essa. Tenta de novo.");
+        setFeedback({
+          takeId,
+          correct: false,
+          message: `"${body}" não é. Ouve de novo e tenta outra.`,
+        });
+        setFlash("");
       }
 
-      setTimeout(() => setFlash(""), 2600);
       await loadTakes();
       onRefresh();
     });
@@ -429,6 +440,7 @@ export function OnlineTurnScreen({
             canGuess={canGuess}
             busy={busy}
             onGuess={guess}
+            feedback={feedback}
           />
         </>
       ) : null}
@@ -476,7 +488,7 @@ export function OnlineTurnScreen({
 
       {flash ? (
         <p
-          className="bg-grape text-lemon stroke-thin font-display fixed bottom-6 left-1/2 z-40 w-[min(22rem,90vw)] -translate-x-1/2 rounded-xl px-4 py-2 text-center text-base uppercase"
+          className="bg-mint text-paper stroke-hard hard-shadow font-display fixed bottom-6 left-1/2 z-40 w-[min(22rem,90vw)] -translate-x-1/2 rounded-xl px-4 py-3 text-center text-lg uppercase leading-tight"
           style={{ animation: "rise-in 0.3s both" }}
         >
           {flash}

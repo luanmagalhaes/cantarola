@@ -3,16 +3,24 @@
 import { useState } from "react";
 import type { TakeView } from "@/lib/api/client";
 
+export interface GuessFeedback {
+  takeId: string;
+  correct: boolean;
+  message: string;
+}
+
 export function TakeList({
   takes,
   canGuess,
   busy,
   onGuess,
+  feedback,
 }: {
   takes: TakeView[];
   canGuess: boolean;
   busy: boolean;
   onGuess: (takeId: string, body: string) => void;
+  feedback?: GuessFeedback | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -37,6 +45,10 @@ export function TakeList({
     <ul className="flex w-full max-w-sm flex-col gap-2">
       {takes.map((take, index) => {
         const open = openId === take.id;
+        const miss =
+          feedback && feedback.takeId === take.id && !feedback.correct
+            ? feedback
+            : null;
 
         return (
           <li
@@ -67,48 +79,59 @@ export function TakeList({
                 {take.solvedByName} acertou
               </p>
             ) : canGuess ? (
-              open ? (
-                <form
-                  className="mt-2 flex gap-2"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+              <>
+                {open ? (
+                  <form
+                    className="mt-2 flex gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
 
-                    if (draft.trim().length < 2) {
-                      return;
-                    }
+                      if (draft.trim().length < 2) {
+                        return;
+                      }
 
-                    onGuess(take.id, draft.trim());
-                    setDraft("");
-                  }}
-                >
-                  <input
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Nome da música"
-                    maxLength={60}
-                    autoFocus
-                    className="bg-cream stroke-thin font-sans min-w-0 flex-1 rounded-lg px-3 py-2 text-base font-bold outline-none placeholder:opacity-40"
-                  />
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="font-display bg-coral text-paper stroke-thin rounded-lg px-3 py-2 text-sm uppercase disabled:opacity-50"
+                      onGuess(take.id, draft.trim());
+                    }}
                   >
-                    Vai
+                    <input
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      placeholder="Nome da música"
+                      maxLength={60}
+                      autoFocus
+                      className="bg-cream stroke-thin font-sans min-w-0 flex-1 rounded-lg px-3 py-2 text-base font-bold outline-none placeholder:opacity-40"
+                    />
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="font-display bg-coral text-paper stroke-thin rounded-lg px-3 py-2 text-sm uppercase disabled:opacity-50"
+                    >
+                      {busy ? "..." : "Vai"}
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenId(take.id);
+                      setDraft("");
+                    }}
+                    className="font-display bg-gold text-grape stroke-thin mt-2 w-full rounded-lg px-2 py-1.5 text-sm uppercase"
+                  >
+                    Chutar essa
                   </button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenId(take.id);
-                    setDraft("");
-                  }}
-                  className="font-display bg-gold text-grape stroke-thin mt-2 w-full rounded-lg px-2 py-1.5 text-sm uppercase"
-                >
-                  Chutar essa
-                </button>
-              )
+                )}
+
+                {miss ? (
+                  <p
+                    role="status"
+                    className="font-display bg-coral text-paper stroke-thin mt-2 rounded-lg px-3 py-2 text-center text-sm uppercase leading-snug"
+                    style={{ animation: "shake 0.4s both" }}
+                  >
+                    {miss.message}
+                  </p>
+                ) : null}
+              </>
             ) : null}
           </li>
         );
