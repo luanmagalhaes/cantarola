@@ -294,6 +294,7 @@ export function LocalTurnScreen({
           <div className="flex w-full max-w-sm flex-col gap-2">
             {stealing ? (
               <Button
+            size="sm"
                 color="grape"
                 disabled={busy}
                 onClick={() => void dispatch(() => api.endSteal(room.code, token))}
@@ -302,6 +303,7 @@ export function LocalTurnScreen({
               </Button>
             ) : (
               <Button
+            size="sm"
                 color="grape"
                 disabled={busy || pending.length === songs.length}
                 onClick={() => void dispatch(() => api.closeTurn(room.code, token))}

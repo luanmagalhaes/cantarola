@@ -404,6 +404,7 @@ export function OnlineTurnScreen({
           )}
 
           <Button
+            size="sm"
             color="grape"
             disabled={busy || sentSongIds.size === 0}
             onClick={() =>
@@ -462,6 +463,7 @@ export function OnlineTurnScreen({
         <>
           <TakeList takes={takes} canGuess={false} busy={busy} onGuess={guess} />
           <Button
+            size="sm"
             color="grape"
             disabled={busy}
             onClick={() =>
