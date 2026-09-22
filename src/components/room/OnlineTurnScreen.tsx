@@ -325,11 +325,11 @@ export function OnlineTurnScreen({
                     controls
                     className="w-full"
                   />
-                  <div className="flex w-full gap-2">
+                  <div className="flex w-full flex-col gap-2">
                     <Button color="mint" disabled={busy} onClick={sendTake}>
-                      {busy ? "Mandando..." : "Mandar"}
+                      {busy ? "Mandando" : "Mandar"}
                     </Button>
-                    <Button color="paper" onClick={recorder.reset}>
+                    <Button color="paper" disabled={busy} onClick={recorder.reset}>
                       Regravar
                     </Button>
                   </div>
@@ -358,7 +358,7 @@ export function OnlineTurnScreen({
                 }}
                 className="font-display text-grape text-xs uppercase underline"
               >
-                Trocar de música
+                Voltar pra lista
               </button>
             </div>
           ) : (

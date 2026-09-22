@@ -14,14 +14,23 @@ const colors: Record<Color, string> = {
   mint: "bg-mint text-paper",
 };
 
+type Size = "md" | "sm";
+
+const sizes: Record<Size, string> = {
+  md: "px-6 py-4 text-2xl",
+  sm: "px-3 py-2.5 text-base",
+};
+
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   color?: Color;
   width?: "full" | "auto";
+  size?: Size;
 };
 
 export function Button({
   color = "paper",
   width = "full",
+  size = "md",
   className = "",
   children,
   onClick,
@@ -35,9 +44,9 @@ export function Button({
   return (
     <button
       onClick={handleClick}
-      className={`font-display stroke-hard hard-shadow rounded-2xl px-6 py-4 text-2xl uppercase tracking-wide transition-transform duration-100 active:translate-x-[3px] active:translate-y-[3px] active:shadow-[2px_2px_0_var(--color-grape)] disabled:opacity-50 ${
-        colors[color]
-      } ${width === "full" ? "w-full" : ""} ${className}`}
+      className={`font-display stroke-hard hard-shadow rounded-2xl uppercase tracking-wide transition-transform duration-100 active:translate-x-[3px] active:translate-y-[3px] active:shadow-[2px_2px_0_var(--color-grape)] disabled:opacity-50 ${
+        sizes[size]
+      } ${colors[color]} ${width === "full" ? "w-full" : ""} ${className}`}
       {...rest}
     >
       {children}

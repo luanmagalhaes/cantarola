@@ -55,6 +55,7 @@ export function TurnControls({
       <div className="flex gap-2">
         {canPause ? (
           <Button
+            size="sm"
             color={paused ? "lemon" : "paper"}
             disabled={working || busy}
             onClick={() => {
@@ -72,6 +73,7 @@ export function TurnControls({
 
         {canUndo ? (
           <Button
+            size="sm"
             color="paper"
             disabled={working || busy}
             onClick={() => {
