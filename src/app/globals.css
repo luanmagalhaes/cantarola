@@ -1,0 +1,305 @@
+@import "tailwindcss";
+
+@theme {
+  --color-grape: #512664;
+  --color-grape-soft: #6d3a85;
+  --color-lemon: #f0dc05;
+  --color-gold: #fab200;
+  --color-amber: #ffbd1b;
+  --color-coral: #eb5c5a;
+  --color-coral-soft: #f08274;
+  --color-cream: #fffbc4;
+  --color-paper: #fffce3;
+  --color-mint: #2fa36b;
+  --color-team-red: #eb5c5a;
+  --color-team-blue: #3d7ad6;
+
+  --font-display: var(--font-cartoon), system-ui, sans-serif;
+  --font-sans: var(--font-body), system-ui, sans-serif;
+}
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-cream);
+  color: var(--color-grape);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font-family: inherit;
+  touch-action: manipulation;
+}
+
+button:not(:disabled),
+label,
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-grape) 45%, transparent)
+    transparent;
+}
+
+.scroll-area::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-area::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-grape) 45%, transparent);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+@utility stroke-hard {
+  border: 4px solid var(--color-grape);
+}
+
+@utility stroke-thin {
+  border: 3px solid var(--color-grape);
+}
+
+@utility hard-shadow {
+  box-shadow: 5px 5px 0 var(--color-grape);
+}
+
+@utility hard-shadow-lg {
+  box-shadow: 8px 8px 0 var(--color-grape);
+}
+
+@utility outline-text {
+  -webkit-text-stroke: 8px var(--color-grape);
+  paint-order: stroke fill;
+}
+
+@utility outline-text-thin {
+  -webkit-text-stroke: 4px var(--color-grape);
+  paint-order: stroke fill;
+}
+
+@utility confetti-dots {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--color-gold) 55%, transparent) 2px,
+    transparent 2.4px
+  );
+  background-size: 18px 18px;
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: translateY(-110%) scale(0.6) rotate(-12deg);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(6%) scale(1.08) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px) rotate(-1deg);
+  }
+  75% {
+    transform: translateX(6px) rotate(1deg);
+  }
+}
+
+@keyframes note-float {
+  0% {
+    transform: translateY(0) rotate(-8deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120px) rotate(14deg);
+    opacity: 0;
+  }
+}
+
+@keyframes card-in {
+  0% {
+    transform: translateY(24px) scale(0.86) rotate(-4deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes score-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.3) rotate(-4deg);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-15vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes splash-out {
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+@keyframes stamp-in {
+  0% {
+    transform: scale(2.4) rotate(-14deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.92) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes team-flash {
+  0%,
+  100% {
+    background-color: var(--color-team-red);
+  }
+  50% {
+    background-color: var(--color-team-blue);
+  }
+}
+
+@keyframes column-in {
+  from {
+    transform: translateY(28px) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes name-reveal {
+  from {
+    transform: translateX(-14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes trophy-in {
+  0% {
+    transform: scale(0.3) rotate(-20deg);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.14) rotate(6deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-record {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 5px 5px 0 var(--color-grape);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 5px 5px 0 var(--color-grape);
+  }
+}
+
+@keyframes mic-swing {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

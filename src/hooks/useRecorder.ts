@@ -1,0 +1,142 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
+export type RecorderStatus = "idle" | "recording" | "ready" | "blocked";
+
+const candidateTypes = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+];
+
+function bestMimeType(): string {
+  if (typeof MediaRecorder === "undefined") {
+    return "";
+  }
+
+  return candidateTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+export interface Take {
+  blob: Blob;
+  url: string;
+  seconds: number;
+}
+
+export function useRecorder(maxSeconds: number) {
+  const [status, setStatus] = useState<RecorderStatus>("idle");
+  const [seconds, setSeconds] = useState(0);
+  const [take, setTake] = useState<Take | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startedAtRef = useRef(0);
+  const urlRef = useRef<string | null>(null);
+
+  const releaseUrl = useCallback(() => {
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    }
+  }, []);
+
+  const stop = useCallback(() => {
+    const recorder = recorderRef.current;
+
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+  }, []);
+
+  const start = useCallback(async () => {
+    releaseUrl();
+    setTake(null);
+    setSeconds(0);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = bestMimeType();
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
+
+      chunksRef.current = [];
+      recorderRef.current = recorder;
+      startedAtRef.current = Date.now();
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        const type = recorder.mimeType.split(";")[0] || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
+        const elapsed = Math.max(
+          1,
+          Math.round((Date.now() - startedAtRef.current) / 1000),
+        );
+
+        if (blob.size === 0) {
+          setStatus("idle");
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+
+        urlRef.current = url;
+        setTake({ blob, url, seconds: Math.min(elapsed, maxSeconds) });
+        setStatus("ready");
+      };
+
+      recorder.start();
+      setStatus("recording");
+    } catch {
+      setStatus("blocked");
+    }
+  }, [maxSeconds, releaseUrl]);
+
+  const reset = useCallback(() => {
+    releaseUrl();
+    setTake(null);
+    setSeconds(0);
+    setStatus("idle");
+  }, [releaseUrl]);
+
+  useEffect(() => {
+    if (status !== "recording") {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSeconds(Math.round((Date.now() - startedAtRef.current) / 1000));
+    }, 250);
+
+    return () => clearInterval(timer);
+  }, [status]);
+
+  useEffect(() => {
+    if (status === "recording" && seconds >= maxSeconds) {
+      stop();
+    }
+  }, [status, seconds, maxSeconds, stop]);
+
+  useEffect(() => {
+    return () => {
+      const recorder = recorderRef.current;
+
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+
+      releaseUrl();
+    };
+  }, [releaseUrl]);
+
+  return { status, seconds, take, start, stop, reset };
+}
