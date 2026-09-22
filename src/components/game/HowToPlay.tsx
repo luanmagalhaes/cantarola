@@ -96,7 +96,7 @@ const slides: Slide[] = [
           </p>
           <p className="text-xs font-bold">
             Todo mundo junto. Você canta ao vivo e tem{" "}
-            <Good>45 segundos</Good> pra emplacar o máximo de músicas.
+            <Good>60 segundos</Good> pra emplacar o máximo de músicas.
           </p>
         </div>
         <div className="bg-paper stroke-hard rounded-2xl p-3">
@@ -318,18 +318,28 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
             ))}
           </div>
 
-          <div className="flex gap-2">
-            {step > 0 ? (
-              <Button color="paper" onClick={() => setStep(step - 1)}>
-                Voltar
-              </Button>
-            ) : null}
-            <Button
-              color={isLast ? "coral" : "grape"}
-              onClick={() => (isLast ? onClose() : setStep(step + 1))}
-            >
-              {isLast ? "Valeu, pai. Entendido" : "Saquei"}
-            </Button>
+          <div className={`flex gap-2 ${isLast ? "flex-col" : ""}`}>
+            {isLast ? (
+              <>
+                <Button color="coral" onClick={onClose}>
+                  <span className="text-lg">Valeu, pai. Entendido</span>
+                </Button>
+                <Button color="paper" onClick={() => setStep(step - 1)}>
+                  <span className="text-lg">Voltar</span>
+                </Button>
+              </>
+            ) : (
+              <>
+                {step > 0 ? (
+                  <Button color="paper" onClick={() => setStep(step - 1)}>
+                    Voltar
+                  </Button>
+                ) : null}
+                <Button color="grape" onClick={() => setStep(step + 1)}>
+                  Saquei
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -54,7 +54,8 @@ export interface TurnRow {
   team: Team;
   status: TurnStatus;
   twist: Twist | null;
-  bomb_song_id: string | null;
+  bomb_position: number | null;
+  bomb_song_id?: string | null;
   started_at: string | null;
   ends_at: string | null;
   paused_at: string | null;

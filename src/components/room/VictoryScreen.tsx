@@ -7,7 +7,7 @@ import { Scoreboard } from "@/components/room/Scoreboard";
 import { api, type RoomState } from "@/lib/api/client";
 import { copy } from "@/data/copy";
 import { winnerOf } from "@/lib/game/rules";
-import { playSound } from "@/lib/sound";
+import { playSound, stopAnthem } from "@/lib/sound";
 
 const confettiColors = [
   "var(--color-coral)",
@@ -76,6 +76,7 @@ export function VictoryScreen({
   const champion = winnerOf(state.score);
 
   useEffect(() => {
+    stopAnthem();
     playSound("win");
   }, []);
 

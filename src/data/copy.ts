@@ -13,7 +13,7 @@ export const copy = {
     local: {
       title: "Presencial",
       line: "Todo mundo na mesma sala",
-      detail: "Você canta ao vivo, o time grita o nome da música. 45 segundos.",
+      detail: "Você canta ao vivo, o time grita o nome da música. 60 segundos.",
     },
     online: {
       title: "Online",

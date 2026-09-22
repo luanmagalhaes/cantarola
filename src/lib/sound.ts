@@ -67,6 +67,11 @@ export function toggleMuted() {
   const next = !readMuted();
 
   window.localStorage.setItem(mutedKey, next ? "1" : "0");
+
+  if (next) {
+    stopAnthem();
+  }
+
   notify();
 }
 

@@ -31,7 +31,7 @@ import type {
 
 export type PlayMode = "local" | "online";
 
-const localSeconds = 45;
+const localSeconds = 60;
 const onlineSeconds = 90;
 
 function fail(status: number): never {
@@ -362,7 +362,8 @@ async function createTurn(
 
   const twist = pickTwist(room.twists ?? []);
   const songIds = await drawSongs(room, songsPerTurn);
-  const bombId = twist === "bomb" ? shuffle(songIds)[0] : null;
+  const bombPosition =
+    twist === "bomb" ? shuffle(songIds.map((_, index) => index))[0] : null;
 
   const { data } = await serverClient()
     .from("ll_turns")
@@ -371,7 +372,7 @@ async function createTurn(
       singer_id: plan.singerId,
       team: plan.team,
       twist,
-      bomb_song_id: bombId,
+      bomb_position: bombPosition,
     })
     .select("*")
     .single();
@@ -499,7 +500,10 @@ export async function markSong(
     fail(409);
   }
 
-  const points = pointsFor(outcome, turn.bomb_song_id === songId);
+  const points = pointsFor(
+    outcome,
+    turn.bomb_position !== null && turn.bomb_position === target.position,
+  );
   const scoringTeam = scoringTeamFor(outcome, turn.team);
   const client = serverClient();
 
@@ -848,6 +852,21 @@ function visibleSongs(
   }));
 }
 
+export async function bombSongIdFor(
+  turn: TurnRow,
+  songs: TurnSongRow[],
+): Promise<string | null> {
+  if (turn.bomb_position === null) {
+    return null;
+  }
+
+  const rows = songs.length > 0 ? songs : await turnSongs(turn.id);
+
+  return (
+    rows.find((row) => row.position === turn.bomb_position)?.song_id ?? null
+  );
+}
+
 export async function roomState(room: RoomRow, me: PlayerRow) {
   const [players, results] = await Promise.all([
     roomPlayers(room.id),
@@ -862,7 +881,10 @@ export async function roomState(room: RoomRow, me: PlayerRow) {
   return {
     room,
     players,
-    turn: turn && !revealed ? { ...turn, bomb_song_id: null } : turn,
+    turn:
+      turn && revealed
+        ? { ...turn, bomb_song_id: await bombSongIdFor(turn, songs) }
+        : turn,
     me,
     isSinger,
     songs: visibleSongs(songs, revealed),

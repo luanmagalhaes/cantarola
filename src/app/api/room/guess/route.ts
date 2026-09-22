@@ -11,6 +11,7 @@ import {
 import { songById } from "@/data/songs";
 import { answerMatches } from "@/lib/guess";
 import { pointsFor } from "@/lib/game/rules";
+import { bombSongIdFor } from "@/lib/game/service";
 import { serverClient } from "@/lib/supabase/server";
 
 interface Body {
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     }
 
     const outcome = isRival ? "stolen" : "hit";
+    const bombSongId = await bombSongIdFor(turn, []);
 
     await client
       .from("ll_turn_songs")
@@ -111,7 +113,7 @@ export async function POST(request: Request) {
       song_id: take.song_id,
       outcome,
       scoring_team: me.team,
-      points: pointsFor(outcome, turn.bomb_song_id === take.song_id),
+      points: pointsFor(outcome, bombSongId === take.song_id),
     });
 
     await logGuess(true);

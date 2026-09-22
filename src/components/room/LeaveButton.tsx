@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { clearSession } from "@/lib/session";
-import { playSound } from "@/lib/sound";
+import { playSound, stopAnthem } from "@/lib/sound";
 
 export function LeaveButton() {
   const router = useRouter();
@@ -52,6 +52,7 @@ export function LeaveButton() {
               <Button
                 color="coral"
                 onClick={() => {
+                  stopAnthem();
                   clearSession();
                   router.push("/");
                 }}
