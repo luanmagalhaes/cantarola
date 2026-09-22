@@ -242,7 +242,7 @@ const slides: Slide[] = [
     tone: "bg-team-red text-paper",
     art: (
       <div className="flex items-center justify-center gap-2">
-        {["4", "5", "s"].map((piece) => (
+        {["6", "0", "s"].map((piece) => (
           <span
             key={piece}
             className="font-display bg-paper text-grape stroke-hard flex h-14 w-11 items-center justify-center rounded-xl text-2xl"
