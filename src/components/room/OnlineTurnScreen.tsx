@@ -291,6 +291,19 @@ export function OnlineTurnScreen({
 
           {target ? (
             <div className="bg-paper stroke-hard hard-shadow flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl px-4 py-4">
+              <div className="bg-lemon stroke-hard w-full rounded-xl px-3 py-2 text-center">
+                <p className="font-display text-grape/60 text-[0.65rem] uppercase leading-none">
+                  Cantarolando
+                </p>
+                <p className="font-display text-grape mt-1 text-xl uppercase leading-tight">
+                  {songs.find((row) => row.songId === target)?.song?.title ??
+                    "essa música"}
+                </p>
+                <p className="text-grape/70 mt-0.5 text-xs font-bold leading-tight">
+                  {songs.find((row) => row.songId === target)?.song?.artist}
+                </p>
+              </div>
+
               {recorder.status === "recording" ? (
                 <>
                   <button
