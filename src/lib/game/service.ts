@@ -35,6 +35,7 @@ export type PlayMode = "local" | "online";
 
 const localSeconds = 60;
 const onlineSeconds = 90;
+const answerSeconds = 180;
 
 function fail(status: number): never {
   throw new ServiceError(status, messageFor(status));
@@ -476,6 +477,12 @@ export async function startTurn(room: RoomRow, me: PlayerRow) {
       status: "running",
       started_at: new Date(now).toISOString(),
       ends_at: new Date(now + room.turn_seconds * 1000).toISOString(),
+      answer_ends_at:
+        room.play_mode === "online"
+          ? new Date(
+              now + room.turn_seconds * 1000 + answerSeconds * 1000,
+            ).toISOString()
+          : null,
     })
     .eq("id", turn.id);
 }
@@ -568,7 +575,8 @@ export async function closeTurn(room: RoomRow, me: PlayerRow) {
     return;
   }
 
-  const ranOut = turn.ends_at ? Date.parse(turn.ends_at) <= Date.now() : false;
+  const deadline = turn.answer_ends_at ?? turn.ends_at;
+  const ranOut = deadline ? Date.parse(deadline) <= Date.now() : false;
 
   if (!ranOut && turn.singer_id !== me.id && !me.is_host) {
     throw new ServiceError(403, "Só quem canta encerra antes do tempo.");
@@ -805,6 +813,9 @@ export async function resumeTurn(room: RoomRow, me: PlayerRow) {
     .update({
       paused_at: null,
       ends_at: new Date(new Date(turn.ends_at).getTime() + held).toISOString(),
+      answer_ends_at: turn.answer_ends_at
+        ? new Date(new Date(turn.answer_ends_at).getTime() + held).toISOString()
+        : null,
     })
     .eq("id", turn.id);
 }

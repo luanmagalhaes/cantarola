@@ -52,12 +52,25 @@ export function OnlineTurnScreen({
     state.clockOffset,
     now,
   );
+  const answerMs = leftMsFor(
+    turn?.answer_ends_at,
+    turn?.paused_at,
+    state.clockOffset,
+    now,
+  );
   const rawLeft = running
     ? Math.max(0, Math.ceil(leftMs / 1000))
     : room.turn_seconds;
-  const secondsLeft = Math.min(rawLeft, room.turn_seconds);
+  const answerLeft = running ? Math.max(0, Math.ceil(answerMs / 1000)) : 0;
+  const recordingOver = running && rawLeft <= 0;
+  const answering = recordingOver && answerLeft > 0;
+  const secondsLeft = Math.min(
+    answering ? answerLeft : rawLeft,
+    answering ? answerLeft : room.turn_seconds,
+  );
   const warmingUp = running && rawLeft > room.turn_seconds;
-  const timeUp = running && !paused && rawLeft <= 0;
+  const timeUp =
+    running && !paused && rawLeft <= 0 && (!turn?.answer_ends_at || answerLeft <= 0);
   const stealing = turn?.status === "stealing";
   const isRival = state.me.team !== turn?.team;
   const soloSinger =
@@ -116,12 +129,12 @@ export function OnlineTurnScreen({
   }, [turn?.twist]);
 
   useEffect(() => {
-    if (!timeUp) {
+    if (!recordingOver) {
       return;
     }
 
     void playAnthem();
-  }, [timeUp]);
+  }, [recordingOver]);
 
   useEffect(() => {
     if (!timeUp || closing.current) {
@@ -228,7 +241,7 @@ export function OnlineTurnScreen({
         team={turn.team}
         twist={turn.twist}
         secondsLeft={secondsLeft}
-        totalSeconds={room.turn_seconds}
+        totalSeconds={answering ? answerLeft || 1 : room.turn_seconds}
         warmingUp={Boolean(warmingUp)}
         score={score}
       />
@@ -248,6 +261,17 @@ export function OnlineTurnScreen({
         busy={busy}
         onRefresh={onRefresh}
       />
+
+      {answering ? (
+        <div className="bg-coral stroke-hard hard-shadow w-full max-w-sm rounded-2xl px-4 py-3 text-center">
+          <p className="font-display text-paper text-2xl uppercase leading-none">
+            Hora de acertar
+          </p>
+          <p className="text-paper mt-1 text-xs font-bold leading-snug">
+            A gravação fechou. Ainda dá pra ouvir e chutar.
+          </p>
+        </div>
+      ) : null}
 
       {turn.status === "ready" ? (
         <div className="flex w-full max-w-sm flex-col items-center gap-3">
@@ -286,7 +310,7 @@ export function OnlineTurnScreen({
         </div>
       ) : null}
 
-      {isSinger && running ? (
+      {isSinger && running && !recordingOver ? (
         <>
           <div className="bg-grape w-full max-w-sm rounded-2xl px-4 py-3 text-center">
             <p className="font-display text-lemon text-lg uppercase leading-tight">
@@ -303,6 +327,7 @@ export function OnlineTurnScreen({
             {songs.map((row, index) => {
               const alreadySent = sentSongIds.has(row.songId);
               const mine = target === row.songId;
+              const preparing = mine && recorder.status === "idle";
               const recording = mine && recorder.status === "recording";
               const ready = mine && recorder.status === "ready" && recorder.take;
               const otherBusy =
@@ -373,7 +398,7 @@ export function OnlineTurnScreen({
                         <>
                           <button
                             type="button"
-                            disabled={alreadySent || otherBusy}
+                            disabled={alreadySent || otherBusy || preparing}
                             onClick={() => {
                               playSound("card");
                               setTarget(row.songId);
@@ -383,7 +408,11 @@ export function OnlineTurnScreen({
                             className="bg-coral stroke-thin font-display text-paper flex flex-1 items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-40"
                           >
                             <span className="text-base leading-none">●</span>
-                            {alreadySent ? "Já mandei" : "Gravar"}
+                            {alreadySent
+                              ? "Já mandei"
+                              : preparing
+                                ? "Abrindo o microfone"
+                                : "Gravar"}
                           </button>
                           {row.song ? (
                             <button
@@ -468,7 +497,7 @@ export function OnlineTurnScreen({
         </>
       ) : null}
 
-      {isSinger && stealing ? (
+      {isSinger && (stealing || answering) ? (
         <>
           <TakeList takes={takes} canGuess={false} busy={busy} onGuess={guess} />
           <Button
@@ -478,12 +507,14 @@ export function OnlineTurnScreen({
             disabled={busy}
             onClick={() =>
               void dispatch(async () => {
-                await api.endSteal(room.code, token);
+                await (stealing
+                  ? api.endSteal(room.code, token)
+                  : api.closeTurn(room.code, token));
                 onRefresh();
               })
             }
           >
-            Encerrar o roubo
+            {stealing ? "Encerrar o roubo" : "Fechar a rodada"}
           </Button>
         </>
       ) : null}

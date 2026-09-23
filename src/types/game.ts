@@ -61,6 +61,7 @@ export interface TurnRow {
   started_at: string | null;
   ends_at: string | null;
   paused_at: string | null;
+  answer_ends_at: string | null;
 }
 
 export interface TurnSongRow {

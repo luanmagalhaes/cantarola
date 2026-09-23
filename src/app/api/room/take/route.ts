@@ -9,10 +9,12 @@ import {
   turnSongs,
   type TakeRow,
 } from "@/app/api/_shared";
+import { ServiceError } from "@/lib/messages";
 import { serverClient } from "@/lib/supabase/server";
 
 const bucket = "ll-audio";
 const maxBytes = 2 * 1024 * 1024;
+const minBytes = 1024;
 const maxSeconds = 90;
 
 const extensionByMime: Record<string, string> = {
@@ -50,8 +52,15 @@ export async function POST(request: Request) {
       reject(400);
     }
 
-    if (file.size === 0 || file.size > maxBytes) {
+    if (file.size > maxBytes) {
       reject(400);
+    }
+
+    if (file.size < minBytes) {
+      throw new ServiceError(
+        422,
+        "A gravação saiu vazia. Grava de novo, segurando até aparecer o áudio.",
+      );
     }
 
     const mime = file.type.split(";")[0].trim().toLowerCase();

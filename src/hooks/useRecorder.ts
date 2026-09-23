@@ -32,6 +32,7 @@ export function useRecorder(maxSeconds: number) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef(0);
+  const startingRef = useRef(false);
   const urlRef = useRef<string | null>(null);
 
   const releaseUrl = useCallback(() => {
@@ -50,6 +51,13 @@ export function useRecorder(maxSeconds: number) {
   }, []);
 
   const start = useCallback(async () => {
+    const running = recorderRef.current;
+
+    if (startingRef.current || (running && running.state !== "inactive")) {
+      return;
+    }
+
+    startingRef.current = true;
     releaseUrl();
     setTake(null);
     setSeconds(0);
@@ -75,6 +83,10 @@ export function useRecorder(maxSeconds: number) {
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
 
+        if (recorderRef.current !== recorder) {
+          return;
+        }
+
         const type = recorder.mimeType.split(";")[0] || "audio/webm";
         const blob = new Blob(chunksRef.current, { type });
         const elapsed = Math.max(
@@ -98,6 +110,8 @@ export function useRecorder(maxSeconds: number) {
       setStatus("recording");
     } catch {
       setStatus("blocked");
+    } finally {
+      startingRef.current = false;
     }
   }, [maxSeconds, releaseUrl]);
 
