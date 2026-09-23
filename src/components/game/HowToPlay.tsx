@@ -268,8 +268,8 @@ const slides: Slide[] = [
           </p>
         </div>
         <p className="text-sm font-bold leading-snug opacity-90">
-          Dá pra jogar a partir de {minPlayers} pessoas, com pelo menos duas de
-          cada lado.
+          Dá pra jogar a partir de {minPlayers} pessoas. No um contra um, quem
+          não está cantando é quem adivinha — e leva o ponto.
         </p>
       </div>
     ),

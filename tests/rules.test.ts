@@ -16,6 +16,7 @@ import {
   songsPerTurn,
   teams,
   teamsBalanced,
+  singerIsAlone,
   turnsTaken,
   winnerOf,
   withoutTeam,
@@ -72,8 +73,8 @@ describe("constantes da partida", () => {
     expect(teams).toEqual(["red", "blue"]);
   });
 
-  it("aceita de 4 a 16 jogadores", () => {
-    expect(minPlayers).toBe(4);
+  it("aceita de 2 a 16 jogadores", () => {
+    expect(minPlayers).toBe(2);
     expect(maxPlayers).toBe(16);
   });
 
@@ -221,13 +222,25 @@ describe("canStart", () => {
     expect(canStart(lineup())).toBe(true);
   });
 
-  it("bloqueia com menos de 4 jogadores", () => {
+  it("bloqueia com menos de 2 jogadores", () => {
+    expect(canStart([player({ seat: 0, team: "red" })])).toBe(false);
+  });
+
+  it("libera o um contra um", () => {
+    const players = [
+      player({ seat: 0, team: "red" }),
+      player({ seat: 1, team: "blue" }),
+    ];
+    expect(canStart(players)).toBe(true);
+  });
+
+  it("libera tres pessoas em 2x1, que tem diferenca de um", () => {
     const players = [
       player({ seat: 0, team: "red" }),
       player({ seat: 1, team: "blue" }),
       player({ seat: 2, team: "red" }),
     ];
-    expect(canStart(players)).toBe(false);
+    expect(canStart(players)).toBe(true);
   });
 
   it("bloqueia com mais de 16 jogadores", () => {
@@ -467,5 +480,42 @@ describe("shuffle", () => {
 
   it("devolve lista vazia para entrada vazia", () => {
     expect(shuffle([])).toEqual([]);
+  });
+});
+
+
+describe("cantor sozinho no time", () => {
+  const solo = [
+    player({ seat: 0, team: "red" }),
+    player({ seat: 1, team: "blue" }),
+  ];
+
+  it("reconhece quem canta sem parceiro", () => {
+    expect(singerIsAlone(solo, "player-0", "red")).toBe(true);
+  });
+
+  it("time vazio nao conta como sozinho", () => {
+    expect(singerIsAlone([], "player-0", "red")).toBe(false);
+  });
+
+  it("nao confunde com time de dois", () => {
+    const dupla = [
+      player({ seat: 0, team: "red" }),
+      player({ seat: 1, team: "red" }),
+      player({ seat: 2, team: "blue" }),
+    ];
+    expect(singerIsAlone(dupla, "player-0", "red")).toBe(false);
+  });
+
+  it("no um contra um o acerto vai pro adversario", () => {
+    expect(scoringTeamFor("hit", "red", true)).toBe("blue");
+  });
+
+  it("com parceiro o acerto continua no time de quem canta", () => {
+    expect(scoringTeamFor("hit", "red", false)).toBe("red");
+  });
+
+  it("passar nunca pontua, mesmo sozinho", () => {
+    expect(scoringTeamFor("missed", "red", true)).toBeNull();
   });
 });

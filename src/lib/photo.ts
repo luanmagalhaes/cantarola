@@ -1,6 +1,23 @@
 const maxSide = 320;
 const quality = 0.82;
 
+function looksBlank(context: CanvasRenderingContext2D, side: number): boolean {
+  const { data } = context.getImageData(0, 0, side, side);
+  const first = [data[0], data[1], data[2]];
+
+  for (let at = 4; at < data.length; at += 4) {
+    if (
+      Math.abs(data[at] - first[0]) > 6 ||
+      Math.abs(data[at + 1] - first[1]) > 6 ||
+      Math.abs(data[at + 2] - first[2]) > 6
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function shrinkPhoto(file: File): Promise<string> {
   const source = await createImageBitmap(file);
   const scale = Math.min(1, maxSide / Math.max(source.width, source.height));
@@ -12,13 +29,16 @@ export async function shrinkPhoto(file: File): Promise<string> {
   canvas.width = side;
   canvas.height = side;
 
-  const context = canvas.getContext("2d");
+  const context = canvas.getContext("2d", { alpha: false });
 
   if (!context) {
     source.close();
 
     throw new Error("Não consegui preparar a foto neste aparelho.");
   }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, side, side);
 
   context.drawImage(
     source,
@@ -33,6 +53,10 @@ export async function shrinkPhoto(file: File): Promise<string> {
   );
 
   source.close();
+
+  if (looksBlank(context, side)) {
+    throw new Error("Não consegui ler essa foto. Tente outra.");
+  }
 
   return canvas.toDataURL("image/jpeg", quality);
 }

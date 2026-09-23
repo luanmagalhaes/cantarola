@@ -8,7 +8,7 @@ import type {
 } from "@/types/game";
 
 export const teams: Team[] = ["red", "blue"];
-export const minPlayers = 4;
+export const minPlayers = 2;
 export const maxPlayers = 16;
 export const codeLength = 2;
 export const songsPerTurn = 8;
@@ -38,10 +38,24 @@ export function pointsFor(outcome: Outcome, isBomb: boolean): number {
   return isBomb ? 2 : 1;
 }
 
-export function scoringTeamFor(outcome: Outcome, singerTeam: Team): Team | null {
-  if (outcome === "hit") return singerTeam;
+export function scoringTeamFor(
+  outcome: Outcome,
+  singerTeam: Team,
+  singerAlone = false,
+): Team | null {
+  if (outcome === "hit") return singerAlone ? rivalOf(singerTeam) : singerTeam;
   if (outcome === "stolen") return rivalOf(singerTeam);
   return null;
+}
+
+export function singerIsAlone(
+  players: PlayerRow[],
+  singerId: string,
+  team: Team,
+): boolean {
+  const squad = squadOf(players, team);
+
+  return squad.length === 1 && squad[0].id === singerId;
 }
 
 export function scoreFrom(results: ResultRow[]): Score {

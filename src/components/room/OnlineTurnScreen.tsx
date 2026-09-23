@@ -60,9 +60,16 @@ export function OnlineTurnScreen({
   const timeUp = running && !paused && rawLeft <= 0;
   const stealing = turn?.status === "stealing";
   const isRival = state.me.team !== turn?.team;
+  const soloSinger =
+    turn !== null &&
+    state.players
+      .filter((player) => player.team === turn.team)
+      .every((player) => player.id === turn.singer_id);
   const canGuess =
     !isSinger &&
-    (stealing ? isRival : !isRival || turn?.twist === "duel");
+    (stealing
+      ? isRival
+      : !isRival || turn?.twist === "duel" || soloSinger);
 
   const loadTakes = useCallback(async () => {
     try {
@@ -442,7 +449,9 @@ export function OnlineTurnScreen({
           <div className="bg-grape w-full max-w-sm rounded-2xl px-4 py-2 text-center">
             <p className="font-display text-lemon text-sm uppercase leading-tight">
               {canGuess
-                ? "Ouça e escreva o nome da música"
+                ? soloSinger && isRival
+                  ? "Só você pra adivinhar. Acertou, o ponto é seu"
+                  : "Ouça e escreva o nome da música"
                 : stealing
                   ? "O roubo é do outro time"
                   : "Só o time de quem canta chuta essa rodada"}

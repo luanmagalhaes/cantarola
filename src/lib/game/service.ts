@@ -13,6 +13,7 @@ import {
   scoreFrom,
   scoringTeamFor,
   shuffle,
+  singerIsAlone,
   songsPerTurn,
   winnerOf,
 } from "@/lib/game/rules";
@@ -429,7 +430,7 @@ export async function startGame(room: RoomRow, me: PlayerRow) {
   if (!canStart(players)) {
     throw new ServiceError(
       400,
-      "Precisa de pelo menos 4 pessoas, com 2 em cada time.",
+      "Precisa de pelo menos 2 pessoas, com os times equilibrados.",
     );
   }
 
@@ -519,11 +520,13 @@ export async function markSong(
     fail(409);
   }
 
+  const players = await roomPlayers(room.id);
+  const alone = singerIsAlone(players, turn.singer_id, turn.team);
   const points = pointsFor(
     outcome,
     turn.bomb_position !== null && turn.bomb_position === target.position,
   );
-  const scoringTeam = scoringTeamFor(outcome, turn.team);
+  const scoringTeam = scoringTeamFor(outcome, turn.team, alone);
   const client = serverClient();
 
   const { data: claimed } = await client
@@ -582,7 +585,15 @@ export async function closeTurn(room: RoomRow, me: PlayerRow) {
     pending = await dropSongsWithoutTake(turn, pending);
   }
 
-  if (turn.status === "running" && room.steal_enabled && pending.length > 0) {
+  const squad = await roomPlayers(room.id);
+  const soloSinger = singerIsAlone(squad, turn.singer_id, turn.team);
+
+  if (
+    turn.status === "running" &&
+    room.steal_enabled &&
+    !soloSinger &&
+    pending.length > 0
+  ) {
     await claimTurnStatus(turn, "running", "stealing");
 
     return;
