@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { withDuration } from "@/lib/webm";
 
 export type RecorderStatus = "idle" | "recording" | "ready" | "blocked";
 
@@ -92,13 +93,11 @@ export function useRecorder(maxSeconds: number) {
         }
 
         const type = recorder.mimeType.split(";")[0] || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type });
-        const elapsed = Math.max(
-          1,
-          Math.round((Date.now() - startedAtRef.current) / 1000),
-        );
+        const raw = new Blob(chunksRef.current, { type });
+        const heldMs = Date.now() - startedAtRef.current;
+        const elapsed = Math.max(1, Math.round(heldMs / 1000));
 
-        if (blob.size < minUsefulBytes) {
+        if (raw.size < minUsefulBytes) {
           setProblem(
             "Não saiu áudio nenhum. Se estiver em ligação, encerre antes de gravar.",
           );
@@ -106,11 +105,21 @@ export function useRecorder(maxSeconds: number) {
           return;
         }
 
-        const url = URL.createObjectURL(blob);
+        const publish = (blob: Blob) => {
+          const url = URL.createObjectURL(blob);
 
-        urlRef.current = url;
-        setTake({ blob, url, seconds: Math.min(elapsed, maxSeconds) });
-        setStatus("ready");
+          urlRef.current = url;
+          setTake({ blob, url, seconds: Math.min(elapsed, maxSeconds) });
+          setStatus("ready");
+        };
+
+        if (type === "audio/webm") {
+          void withDuration(raw, heldMs).then(publish);
+
+          return;
+        }
+
+        publish(raw);
       };
 
       recorder.start();
