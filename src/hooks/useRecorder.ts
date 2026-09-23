@@ -27,6 +27,8 @@ export interface Take {
   blob: Blob;
   url: string;
   seconds: number;
+  measuredMs: number | null;
+  heldMs: number;
 }
 
 export function useRecorder(maxSeconds: number) {
@@ -110,26 +112,23 @@ export function useRecorder(maxSeconds: number) {
           const measured = await measureDuration(raw);
           const trueMs = measured ?? heldMs;
 
-          if (measured !== null && heldMs > 2000 && measured < heldMs * 0.6) {
-            const lost = Math.round(measured / 1000);
-
-            setProblem(
-              `Só entraram ${lost}s dos ${elapsed}s. Algum app levou o microfone no meio — grave de novo.`,
-            );
-            setStatus("idle");
-
-            return;
-          }
-
+          const sane =
+            measured !== null && heldMs > 0 && measured >= heldMs * 0.6;
+          const headerMs = sane ? (measured as number) : heldMs;
           const blob =
-            type === "audio/webm" ? await withDuration(raw, trueMs) : raw;
+            type === "audio/webm" ? await withDuration(raw, headerMs) : raw;
           const url = URL.createObjectURL(blob);
 
           urlRef.current = url;
           setTake({
             blob,
             url,
-            seconds: Math.min(Math.max(1, Math.round(trueMs / 1000)), maxSeconds),
+            seconds: Math.min(
+              Math.max(1, Math.round(headerMs / 1000)),
+              maxSeconds,
+            ),
+            measuredMs: measured,
+            heldMs,
           });
           setStatus("ready");
         })();

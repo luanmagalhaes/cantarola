@@ -184,7 +184,10 @@ export function OnlineTurnScreen({
     const { blob, seconds } = recorder.take;
 
     await dispatch(async () => {
-      await api.sendTake(room.code, token, songId, blob, seconds);
+      await api.sendTake(room.code, token, songId, blob, seconds, {
+        measuredMs: recorder.take?.measuredMs ?? null,
+        heldMs: recorder.take?.heldMs ?? 0,
+      });
       recorder.reset();
       setTarget(null);
       await loadTakes();

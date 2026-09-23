@@ -245,6 +245,7 @@ export const api = {
     songId: string,
     blob: Blob,
     seconds: number,
+    probe?: { measuredMs: number | null; heldMs: number },
   ) {
     const form = new FormData();
 
@@ -256,6 +257,8 @@ export const api = {
     form.append("songId", songId);
     form.append("seconds", String(seconds));
     form.append("expectedBytes", String(solid.size));
+    form.append("measuredMs", String(probe?.measuredMs ?? ""));
+    form.append("heldMs", String(probe?.heldMs ?? ""));
     form.append("file", solid, "take");
 
     const response = await fetch("/api/room/take", {

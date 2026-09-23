@@ -120,6 +120,8 @@ export async function POST(request: Request) {
         song_id: songId,
         audio_url: audioUrl,
         seconds,
+        measured_ms: Math.round(Number(textField(form, "measuredMs"))) || null,
+        held_ms: Math.round(Number(textField(form, "heldMs"))) || null,
       })
       .select("*")
       .single();
