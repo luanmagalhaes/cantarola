@@ -267,9 +267,16 @@ export function ChatBubble({
                     {message.kind === "audio" && message.audio_url ? (
                       <audio
                         controls
-                        preload="metadata"
+                        preload="auto"
                         src={message.audio_url}
                         className="mt-0.5 h-9 w-52 max-w-full"
+                        onLoadedMetadata={(event) => {
+                          const player = event.currentTarget;
+
+                          if (player.currentTime > 0.05) {
+                            player.currentTime = 0;
+                          }
+                        }}
                       />
                     ) : (
                       <span className="block break-words text-sm font-bold leading-snug">

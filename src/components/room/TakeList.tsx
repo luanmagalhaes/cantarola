@@ -75,8 +75,15 @@ export function TakeList({
             <audio
               src={take.audioUrl}
               controls
-              preload="metadata"
+              preload="auto"
               className="mt-2 w-full"
+              onLoadedMetadata={(event) => {
+                const player = event.currentTarget;
+
+                if (player.currentTime > 0.05) {
+                  player.currentTime = 0;
+                }
+              }}
             />
 
             <ReactionBar
