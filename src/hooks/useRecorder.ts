@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type RecorderStatus = "idle" | "recording" | "ready" | "blocked";
 
+const minUsefulBytes = 1024;
+
 const candidateTypes = [
   "audio/webm;codecs=opus",
   "audio/webm",
@@ -29,6 +31,7 @@ export function useRecorder(maxSeconds: number) {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [seconds, setSeconds] = useState(0);
   const [take, setTake] = useState<Take | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef(0);
@@ -60,6 +63,7 @@ export function useRecorder(maxSeconds: number) {
     startingRef.current = true;
     releaseUrl();
     setTake(null);
+    setProblem(null);
     setSeconds(0);
 
     try {
@@ -94,7 +98,10 @@ export function useRecorder(maxSeconds: number) {
           Math.round((Date.now() - startedAtRef.current) / 1000),
         );
 
-        if (blob.size === 0) {
+        if (blob.size < minUsefulBytes) {
+          setProblem(
+            "Não saiu áudio nenhum. Se estiver em ligação, encerre antes de gravar.",
+          );
           setStatus("idle");
           return;
         }
@@ -109,6 +116,7 @@ export function useRecorder(maxSeconds: number) {
       recorder.start();
       setStatus("recording");
     } catch {
+      setProblem("Preciso do microfone. Libere nos ajustes e tente de novo.");
       setStatus("blocked");
     } finally {
       startingRef.current = false;
@@ -118,6 +126,7 @@ export function useRecorder(maxSeconds: number) {
   const reset = useCallback(() => {
     releaseUrl();
     setTake(null);
+    setProblem(null);
     setSeconds(0);
     setStatus("idle");
   }, [releaseUrl]);
@@ -152,5 +161,5 @@ export function useRecorder(maxSeconds: number) {
     };
   }, [releaseUrl]);
 
-  return { status, seconds, take, start, stop, reset };
+  return { status, seconds, take, problem, start, stop, reset };
 }

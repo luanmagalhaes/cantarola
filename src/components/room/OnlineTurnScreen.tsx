@@ -36,6 +36,7 @@ export function OnlineTurnScreen({
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [feedback, setFeedback] = useState<GuessFeedback | null>(null);
+  const [previewBroken, setPreviewBroken] = useState(false);
   const [busy, setBusy] = useState(false);
   const lastResultId = useRef<string | null>(null);
   const closing = useRef(false);
@@ -330,10 +331,7 @@ export function OnlineTurnScreen({
               const preparing = mine && recorder.status === "idle";
               const recording = mine && recorder.status === "recording";
               const ready = mine && recorder.status === "ready" && recorder.take;
-              const otherBusy =
-                target !== null &&
-                !mine &&
-                (recorder.status === "recording" || recorder.status === "ready");
+              const otherBusy = !mine && recorder.status === "recording";
 
               return (
                 <SongCard
@@ -363,11 +361,19 @@ export function OnlineTurnScreen({
                         </div>
                       ) : ready && recorder.take ? (
                         <div className="flex w-full flex-col gap-2">
-                          <audio
-                            src={recorder.take.url}
-                            controls
-                            className="w-full"
-                          />
+                          {previewBroken ? (
+                            <p className="font-display bg-lemon text-grape stroke-thin rounded-lg px-2 py-1.5 text-center text-xs uppercase leading-snug">
+                              Seu aparelho não toca a prévia, mas a gravação de{" "}
+                              {recorder.take.seconds}s está aqui. Pode mandar.
+                            </p>
+                          ) : (
+                            <audio
+                              src={recorder.take.url}
+                              controls
+                              className="w-full"
+                              onError={() => setPreviewBroken(true)}
+                            />
+                          )}
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -395,12 +401,20 @@ export function OnlineTurnScreen({
                           </div>
                         </div>
                       ) : (
-                        <>
+                        <div className="flex w-full flex-col gap-2">
+                          {mine && recorder.problem ? (
+                            <p className="font-display bg-coral text-paper stroke-thin rounded-lg px-2 py-1.5 text-center text-xs uppercase leading-snug">
+                              {recorder.problem}
+                            </p>
+                          ) : null}
+                          <div className="flex gap-2">
                           <button
                             type="button"
                             disabled={alreadySent || otherBusy || preparing}
                             onClick={() => {
                               playSound("card");
+                              recorder.reset();
+                              setPreviewBroken(false);
                               setTarget(row.songId);
                               void recorder.start();
                             }}
@@ -427,7 +441,8 @@ export function OnlineTurnScreen({
                               ♪
                             </button>
                           ) : null}
-                        </>
+                          </div>
+                        </div>
                       )
                     ) : null
                   }
