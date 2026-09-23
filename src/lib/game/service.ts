@@ -35,7 +35,7 @@ export type PlayMode = "local" | "online";
 
 const localSeconds = 60;
 const onlineSeconds = 90;
-const answerSeconds = 180;
+const answerSeconds = 60;
 
 function fail(status: number): never {
   throw new ServiceError(status, messageFor(status));
