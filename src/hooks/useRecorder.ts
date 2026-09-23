@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { measureDuration } from "@/lib/audio";
 import { withDuration } from "@/lib/webm";
 
 export type RecorderStatus = "idle" | "recording" | "ready" | "blocked";
@@ -105,21 +106,33 @@ export function useRecorder(maxSeconds: number) {
           return;
         }
 
-        const publish = (blob: Blob) => {
+        void (async () => {
+          const measured = await measureDuration(raw);
+          const trueMs = measured ?? heldMs;
+
+          if (measured !== null && heldMs > 2000 && measured < heldMs * 0.6) {
+            const lost = Math.round(measured / 1000);
+
+            setProblem(
+              `Só entraram ${lost}s dos ${elapsed}s. Algum app levou o microfone no meio — grave de novo.`,
+            );
+            setStatus("idle");
+
+            return;
+          }
+
+          const blob =
+            type === "audio/webm" ? await withDuration(raw, trueMs) : raw;
           const url = URL.createObjectURL(blob);
 
           urlRef.current = url;
-          setTake({ blob, url, seconds: Math.min(elapsed, maxSeconds) });
+          setTake({
+            blob,
+            url,
+            seconds: Math.min(Math.max(1, Math.round(trueMs / 1000)), maxSeconds),
+          });
           setStatus("ready");
-        };
-
-        if (type === "audio/webm") {
-          void withDuration(raw, heldMs).then(publish);
-
-          return;
-        }
-
-        publish(raw);
+        })();
       };
 
       recorder.start();

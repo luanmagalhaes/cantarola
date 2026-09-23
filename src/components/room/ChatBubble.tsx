@@ -267,7 +267,7 @@ export function ChatBubble({
                     {message.kind === "audio" && message.audio_url ? (
                       <audio
                         controls
-                        preload="none"
+                        preload="metadata"
                         src={message.audio_url}
                         className="mt-0.5 h-9 w-52 max-w-full"
                       />

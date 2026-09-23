@@ -75,7 +75,7 @@ export function TakeList({
             <audio
               src={take.audioUrl}
               controls
-              preload="none"
+              preload="metadata"
               className="mt-2 w-full"
             />
 
