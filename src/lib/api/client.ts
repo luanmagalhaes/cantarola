@@ -248,11 +248,15 @@ export const api = {
   ) {
     const form = new FormData();
 
+    const bytes = await blob.arrayBuffer();
+    const solid = new Blob([bytes], { type: blob.type });
+
     form.append("code", code);
     form.append("token", token);
     form.append("songId", songId);
     form.append("seconds", String(seconds));
-    form.append("file", blob, "take");
+    form.append("expectedBytes", String(solid.size));
+    form.append("file", solid, "take");
 
     const response = await fetch("/api/room/take", {
       method: "POST",

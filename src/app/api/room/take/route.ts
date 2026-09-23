@@ -56,6 +56,15 @@ export async function POST(request: Request) {
       reject(400);
     }
 
+    const expected = Number(textField(form, "expectedBytes"));
+
+    if (Number.isFinite(expected) && expected > 0 && expected !== file.size) {
+      throw new ServiceError(
+        422,
+        `O áudio chegou cortado (${file.size} de ${expected} bytes). Tente mandar de novo.`,
+      );
+    }
+
     if (file.size < minBytes) {
       throw new ServiceError(
         422,
