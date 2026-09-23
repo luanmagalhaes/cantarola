@@ -147,6 +147,14 @@ export async function playAnthem() {
   }
 }
 
+export function silenceAll() {
+  stopAnthem();
+  elements.forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
+  });
+}
+
 export function stopAnthem() {
   anthemAudio?.pause();
   anthemAudio = null;

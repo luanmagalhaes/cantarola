@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { measureDuration } from "@/lib/audio";
+import { silenceAll } from "@/lib/sound";
 import { withDuration } from "@/lib/webm";
 
 export type RecorderStatus = "idle" | "recording" | "ready" | "blocked";
@@ -65,6 +66,7 @@ export function useRecorder(maxSeconds: number) {
     }
 
     startingRef.current = true;
+    silenceAll();
     releaseUrl();
     setTake(null);
     setProblem(null);
@@ -114,6 +116,16 @@ export function useRecorder(maxSeconds: number) {
 
           const sane =
             measured !== null && heldMs > 0 && measured >= heldMs * 0.6;
+
+          if (measured !== null && heldMs > 3000 && !sane) {
+            setProblem(
+              `O microfone parou sozinho: entraram ${measured / 1000 < 1 ? "menos de 1" : Math.round(measured / 1000)}s dos ${elapsed}s. Grave de novo sem outro app usando som.`,
+            );
+            setStatus("idle");
+
+            return;
+          }
+
           const headerMs = sane ? (measured as number) : heldMs;
           const blob =
             type === "audio/webm" ? await withDuration(raw, headerMs) : raw;

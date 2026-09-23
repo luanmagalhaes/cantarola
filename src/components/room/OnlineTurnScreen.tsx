@@ -350,7 +350,6 @@ export function OnlineTurnScreen({
                           <button
                             type="button"
                             onClick={() => {
-                              playSound("tap");
                               recorder.stop();
                             }}
                             className="bg-coral stroke-hard font-display text-paper flex-1 rounded-lg px-2 py-2 text-sm uppercase"
@@ -415,7 +414,6 @@ export function OnlineTurnScreen({
                             type="button"
                             disabled={alreadySent || otherBusy || preparing}
                             onClick={() => {
-                              playSound("card");
                               recorder.reset();
                               setPreviewBroken(false);
                               setTarget(row.songId);
