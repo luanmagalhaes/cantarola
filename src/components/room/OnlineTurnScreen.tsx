@@ -61,10 +61,8 @@ export function OnlineTurnScreen({
   const stealing = turn?.status === "stealing";
   const isRival = state.me.team !== turn?.team;
   const soloSinger =
-    turn !== null &&
-    state.players
-      .filter((player) => player.team === turn.team)
-      .every((player) => player.id === turn.singer_id);
+    state.players.filter((player) => player.team === "red").length === 1 &&
+    state.players.filter((player) => player.team === "blue").length === 1;
   const canGuess =
     !isSinger &&
     (stealing

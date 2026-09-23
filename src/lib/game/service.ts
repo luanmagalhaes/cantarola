@@ -13,7 +13,7 @@ import {
   scoreFrom,
   scoringTeamFor,
   shuffle,
-  singerIsAlone,
+  isOneOnOne,
   songsPerTurn,
   winnerOf,
 } from "@/lib/game/rules";
@@ -430,7 +430,7 @@ export async function startGame(room: RoomRow, me: PlayerRow) {
   if (!canStart(players)) {
     throw new ServiceError(
       400,
-      "Precisa de pelo menos 2 pessoas, com os times equilibrados.",
+      "Dá pra jogar em dupla ou de 4 pra cima. Com 3, alguém fica sozinho e não teria pra quem cantar.",
     );
   }
 
@@ -521,12 +521,12 @@ export async function markSong(
   }
 
   const players = await roomPlayers(room.id);
-  const alone = singerIsAlone(players, turn.singer_id, turn.team);
+  const duel = isOneOnOne(players);
   const points = pointsFor(
     outcome,
     turn.bomb_position !== null && turn.bomb_position === target.position,
   );
-  const scoringTeam = scoringTeamFor(outcome, turn.team, alone);
+  const scoringTeam = scoringTeamFor(outcome, turn.team, duel);
   const client = serverClient();
 
   const { data: claimed } = await client
@@ -586,7 +586,7 @@ export async function closeTurn(room: RoomRow, me: PlayerRow) {
   }
 
   const squad = await roomPlayers(room.id);
-  const soloSinger = singerIsAlone(squad, turn.singer_id, turn.team);
+  const soloSinger = isOneOnOne(squad);
 
   if (
     turn.status === "running" &&

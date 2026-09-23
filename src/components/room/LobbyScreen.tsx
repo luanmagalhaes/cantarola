@@ -374,6 +374,11 @@ export function LobbyScreen({
           <p className="font-display text-grape text-center text-xs uppercase opacity-80">
             Precisa de {minPlayers} pessoas na sala pra sortear
           </p>
+        ) : players.length === 3 ? (
+          <p className="font-display text-grape text-center text-xs uppercase leading-snug opacity-80">
+            Com 3 alguém fica sozinho num time e não teria pra quem cantar.
+            Joguem em dupla ou chamem mais uma
+          </p>
         ) : null}
 
         {error ? (

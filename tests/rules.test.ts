@@ -16,7 +16,7 @@ import {
   songsPerTurn,
   teams,
   teamsBalanced,
-  singerIsAlone,
+  isOneOnOne,
   turnsTaken,
   winnerOf,
   withoutTeam,
@@ -234,13 +234,13 @@ describe("canStart", () => {
     expect(canStart(players)).toBe(true);
   });
 
-  it("libera tres pessoas em 2x1, que tem diferenca de um", () => {
+  it("bloqueia 2x1, onde o solitario nunca teria quem adivinhasse", () => {
     const players = [
       player({ seat: 0, team: "red" }),
       player({ seat: 1, team: "blue" }),
       player({ seat: 2, team: "red" }),
     ];
-    expect(canStart(players)).toBe(true);
+    expect(canStart(players)).toBe(false);
   });
 
   it("bloqueia com mais de 16 jogadores", () => {
@@ -484,38 +484,88 @@ describe("shuffle", () => {
 });
 
 
-describe("cantor sozinho no time", () => {
-  const solo = [
+describe("um contra um", () => {
+  const duo = [
     player({ seat: 0, team: "red" }),
     player({ seat: 1, team: "blue" }),
   ];
 
-  it("reconhece quem canta sem parceiro", () => {
-    expect(singerIsAlone(solo, "player-0", "red")).toBe(true);
+  it("reconhece o um contra um", () => {
+    expect(isOneOnOne(duo)).toBe(true);
   });
 
-  it("time vazio nao conta como sozinho", () => {
-    expect(singerIsAlone([], "player-0", "red")).toBe(false);
+  it("2x1 nao e um contra um", () => {
+    expect(
+      isOneOnOne([
+        player({ seat: 0, team: "red" }),
+        player({ seat: 1, team: "red" }),
+        player({ seat: 2, team: "blue" }),
+      ]),
+    ).toBe(false);
   });
 
-  it("nao confunde com time de dois", () => {
-    const dupla = [
-      player({ seat: 0, team: "red" }),
-      player({ seat: 1, team: "red" }),
-      player({ seat: 2, team: "blue" }),
-    ];
-    expect(singerIsAlone(dupla, "player-0", "red")).toBe(false);
+  it("sala vazia nao e um contra um", () => {
+    expect(isOneOnOne([])).toBe(false);
   });
 
-  it("no um contra um o acerto vai pro adversario", () => {
+  it("no um contra um o acerto vai pro adversario, que foi quem adivinhou", () => {
     expect(scoringTeamFor("hit", "red", true)).toBe("blue");
   });
 
-  it("com parceiro o acerto continua no time de quem canta", () => {
+  it("fora do um contra um o acerto fica com o time de quem canta", () => {
     expect(scoringTeamFor("hit", "red", false)).toBe("red");
   });
 
-  it("passar nunca pontua, mesmo sozinho", () => {
+  it("passar nunca pontua", () => {
     expect(scoringTeamFor("missed", "red", true)).toBeNull();
+  });
+
+  it("os dois lados pontuam ao longo da partida", () => {
+    const beneficiados = new Set<string>();
+    const squad = duo.map((one) => ({ ...one }));
+    let previous: Team | null = null;
+
+    for (let round = 0; round < 4; round += 1) {
+      const plan = nextTurn(squad, previous);
+
+      if (plan === null) break;
+
+      const quem = scoringTeamFor("hit", plan.team, isOneOnOne(squad));
+
+      if (quem) beneficiados.add(quem);
+
+      const singer = squad.find((one) => one.id === plan.singerId);
+
+      if (singer) singer.spoke_count += 1;
+
+      previous = plan.team;
+    }
+
+    expect([...beneficiados].sort()).toEqual(["blue", "red"]);
+  });
+});
+
+describe("formacoes que podem comecar", () => {
+  const time = (red: number, blue: number) => [
+    ...Array.from({ length: red }, (_, i) => player({ seat: i, team: "red" })),
+    ...Array.from({ length: blue }, (_, i) =>
+      player({ seat: red + i, team: "blue" }),
+    ),
+  ];
+
+  it("libera o um contra um", () => {
+    expect(canStart(time(1, 1))).toBe(true);
+  });
+
+  it("libera 2x2", () => {
+    expect(canStart(time(2, 2))).toBe(true);
+  });
+
+  it("libera 3x2", () => {
+    expect(canStart(time(3, 2))).toBe(true);
+  });
+
+  it("bloqueia uma pessoa so", () => {
+    expect(canStart(time(1, 0))).toBe(false);
   });
 });

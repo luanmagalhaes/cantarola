@@ -41,21 +41,21 @@ export function pointsFor(outcome: Outcome, isBomb: boolean): number {
 export function scoringTeamFor(
   outcome: Outcome,
   singerTeam: Team,
-  singerAlone = false,
+  oneOnOne = false,
 ): Team | null {
-  if (outcome === "hit") return singerAlone ? rivalOf(singerTeam) : singerTeam;
+  if (outcome === "hit") return oneOnOne ? rivalOf(singerTeam) : singerTeam;
   if (outcome === "stolen") return rivalOf(singerTeam);
   return null;
 }
 
-export function singerIsAlone(
-  players: PlayerRow[],
-  singerId: string,
-  team: Team,
-): boolean {
-  const squad = squadOf(players, team);
+export function isOneOnOne(players: PlayerRow[]): boolean {
+  return teams.every((team) => squadOf(players, team).length === 1);
+}
 
-  return squad.length === 1 && squad[0].id === singerId;
+function squadsPlayable(players: PlayerRow[]): boolean {
+  const sizes = teams.map((team) => squadOf(players, team).length);
+
+  return sizes.every((size) => size === 1) || sizes.every((size) => size >= 2);
 }
 
 export function scoreFrom(results: ResultRow[]): Score {
@@ -92,7 +92,8 @@ export function teamsBalanced(players: PlayerRow[]): boolean {
 export function canStart(players: PlayerRow[]): boolean {
   if (players.length < minPlayers) return false;
   if (players.length > maxPlayers) return false;
-  return teamsBalanced(players);
+  if (!teamsBalanced(players)) return false;
+  return squadsPlayable(players);
 }
 
 export function assignTeams(players: PlayerRow[]): Map<string, Team> {

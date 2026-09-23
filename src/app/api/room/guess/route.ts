@@ -11,7 +11,7 @@ import {
 } from "@/app/api/_shared";
 import { songById } from "@/data/songs";
 import { answerMatches } from "@/lib/guess";
-import { pointsFor, singerIsAlone } from "@/lib/game/rules";
+import { isOneOnOne, pointsFor } from "@/lib/game/rules";
 import { bombSongIdFor } from "@/lib/game/service";
 import { serverClient } from "@/lib/supabase/server";
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
     const stealing = turn.status === "stealing";
     const isRival = me.team !== turn.team;
-    const alone = singerIsAlone(await roomPlayers(room.id), turn.singer_id, turn.team);
+    const alone = isOneOnOne(await roomPlayers(room.id));
 
     if (
       stealing
