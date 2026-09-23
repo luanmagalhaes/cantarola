@@ -30,3 +30,17 @@ export async function measureDuration(blob: Blob): Promise<number | null> {
     void context.close();
   }
 }
+
+export function hushPage() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.querySelectorAll("audio, video").forEach((node) => {
+    const player = node as HTMLMediaElement;
+
+    if (!player.paused) {
+      player.pause();
+    }
+  });
+}

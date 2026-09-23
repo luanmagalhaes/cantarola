@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { measureDuration } from "@/lib/audio";
+import { hushPage, measureDuration } from "@/lib/audio";
 import { silenceAll } from "@/lib/sound";
 import { withDuration } from "@/lib/webm";
 
@@ -67,6 +67,7 @@ export function useRecorder(maxSeconds: number) {
 
     startingRef.current = true;
     silenceAll();
+    hushPage();
     releaseUrl();
     setTake(null);
     setProblem(null);
