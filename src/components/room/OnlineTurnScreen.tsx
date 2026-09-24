@@ -131,12 +131,12 @@ export function OnlineTurnScreen({
   }, [turn?.twist]);
 
   useEffect(() => {
-    if (!recordingOver) {
+    if (!recordingOver || !isSinger) {
       return;
     }
 
     void playAnthem();
-  }, [recordingOver]);
+  }, [recordingOver, isSinger]);
 
   useEffect(() => {
     if (!timeUp || closing.current) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { stopAnthem } from "@/lib/sound";
 
 const speeds = [1, 1.5, 2];
 
@@ -68,6 +69,7 @@ export function VoiceNote({
       return;
     }
 
+    stopAnthem();
     document.querySelectorAll("audio").forEach((other) => {
       if (other !== audio && !other.paused) {
         other.pause();
