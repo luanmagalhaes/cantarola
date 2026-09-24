@@ -12,6 +12,7 @@ export const minPlayers = 2;
 export const maxPlayers = 16;
 export const codeLength = 2;
 export const songsPerTurn = 8;
+export const targetTurns = 6;
 
 export interface NextTurn {
   singerId: string;
@@ -111,8 +112,22 @@ export function turnsTaken(players: PlayerRow[], team: Team): number {
   );
 }
 
+export function roundsFor(players: PlayerRow[]): number {
+  const singers = players.filter((player) => player.team !== null).length;
+
+  if (singers === 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.ceil(targetTurns / singers));
+}
+
 function pendingSingers(players: PlayerRow[], team: Team): PlayerRow[] {
-  return squadOf(players, team).filter((player) => player.spoke_count === 0);
+  const rounds = roundsFor(players);
+
+  return squadOf(players, team).filter(
+    (player) => player.spoke_count < rounds,
+  );
 }
 
 function everyonePlayed(players: PlayerRow[]): boolean {
@@ -121,7 +136,8 @@ function everyonePlayed(players: PlayerRow[]): boolean {
 
 function firstPendingOf(players: PlayerRow[], team: Team): PlayerRow | null {
   const queue = [...pendingSingers(players, team)].sort(
-    (one, other) => one.seat - other.seat,
+    (one, other) =>
+      one.spoke_count - other.spoke_count || one.seat - other.seat,
   );
   return queue.length > 0 ? queue[0] : null;
 }

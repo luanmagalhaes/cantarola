@@ -17,6 +17,7 @@ import {
   teams,
   teamsBalanced,
   isOneOnOne,
+  roundsFor,
   turnsTaken,
   winnerOf,
   withoutTeam,
@@ -306,135 +307,111 @@ describe("turnsTaken", () => {
   });
 });
 
-describe("nextTurn", () => {
-  it("abre a partida pelo time vermelho, no menor assento", () => {
-    expect(nextTurn(lineup(), null)).toEqual({
-      singerId: "player-0",
-      team: "red",
-    });
+describe("nextTurn e fim de partida", () => {
+  const time = (red: number, blue: number, cantou = 0) => [
+    ...Array.from({ length: red }, (_, i) =>
+      player({ seat: i, team: "red", spoke_count: cantou }),
+    ),
+    ...Array.from({ length: blue }, (_, i) =>
+      player({ seat: red + i, team: "blue", spoke_count: cantou }),
+    ),
+  ];
+
+  it("a dupla nao acaba na primeira rodada", () => {
+    const squad = time(1, 1);
+
+    expect(roundsFor(squad)).toBe(3);
+    expect(isGameOver(squad)).toBe(false);
   });
 
-  it("alterna o time a cada turno", () => {
-    const players = lineup();
-    players[0].spoke_count = 1;
-    expect(nextTurn(players, "red")).toEqual({
-      singerId: "player-1",
-      team: "blue",
-    });
+  it("a dupla so acaba quando os dois cantaram as tres vezes", () => {
+    expect(isGameOver(time(1, 1, 2))).toBe(false);
+    expect(isGameOver(time(1, 1, 3))).toBe(true);
   });
 
-  it("dá prioridade a quem ainda não cantou, pelo menor assento", () => {
-    const players = lineup();
-    players[0].spoke_count = 1;
-    players[1].spoke_count = 1;
-    expect(nextTurn(players, "blue")).toEqual({
-      singerId: "player-2",
-      team: "red",
-    });
+  it("grupo grande nao vira maratona", () => {
+    expect(roundsFor(time(4, 4))).toBe(1);
+    expect(roundsFor(time(3, 3))).toBe(1);
+    expect(roundsFor(time(2, 2))).toBe(2);
   });
 
-  it("passa a vez ao adversário quando o time da vez já cantou inteiro", () => {
-    const players = [
-      player({ seat: 0, team: "red", spoke_count: 1 }),
-      player({ seat: 1, team: "blue", spoke_count: 1 }),
-      player({ seat: 2, team: "blue", spoke_count: 0 }),
-      player({ seat: 3, team: "blue", spoke_count: 0 }),
-    ];
-    expect(nextTurn(players, "blue")).toEqual({
-      singerId: "player-2",
-      team: "blue",
-    });
+  it("alterna os times a cada turno", () => {
+    const squad = time(2, 2);
+    const plano = nextTurn(squad, "red");
+
+    expect(plano?.team).toBe("blue");
   });
 
-  it("dá turno extra ao time que cantou menos vezes depois de todos cantarem", () => {
-    const players = [
-      player({ seat: 0, team: "red", spoke_count: 1 }),
-      player({ seat: 1, team: "red", spoke_count: 1 }),
-      player({ seat: 2, team: "blue", spoke_count: 1 }),
-    ];
-    expect(nextTurn(players, "blue")).toEqual({
-      singerId: "player-2",
-      team: "blue",
-    });
-  });
-
-  it("dá o turno extra a quem cantou menos, sempre ao mesmo com o mesmo estado", () => {
-    const players = [
+  it("chama primeiro quem cantou menos", () => {
+    const squad = [
       player({ seat: 0, team: "red", spoke_count: 2 }),
-      player({ seat: 1, team: "red", spoke_count: 2 }),
+      player({ seat: 1, team: "red", spoke_count: 0 }),
       player({ seat: 2, team: "blue", spoke_count: 1 }),
       player({ seat: 3, team: "blue", spoke_count: 1 }),
     ];
-    const draws = repeat(60, () => nextTurn(players, "red")?.singerId ?? "none");
-    expect([...draws]).toEqual(["player-2"]);
+
+    expect(nextTurn(squad, "blue")?.singerId).toBe("player-1");
   });
 
-  it("não deixa o jogo travar quando um time ficou sem ninguém", () => {
-    const players = [player({ seat: 0, team: "red", spoke_count: 1 })];
-
-    expect(nextTurn(players, null)).toBeNull();
-    expect(isGameOver(players)).toBe(true);
-  });
-
-  it("nunca escolhe quem já cantou mais que os colegas de time", () => {
-    const players = [
-      player({ seat: 0, team: "red", spoke_count: 3 }),
-      player({ seat: 1, team: "red", spoke_count: 3 }),
-      player({ seat: 2, team: "blue", spoke_count: 3 }),
-      player({ seat: 3, team: "blue", spoke_count: 1 }),
+  it("nao deixa o jogo travar quando um time ficou sem ninguem", () => {
+    const squad = [
+      player({ seat: 0, team: "red", spoke_count: 0 }),
+      player({ seat: 1, team: "red", spoke_count: 0 }),
     ];
-    const draws = repeat(60, () => nextTurn(players, "red")?.singerId ?? "none");
-    expect([...draws]).toEqual(["player-3"]);
+
+    expect(nextTurn(squad, "red")?.team).toBe("red");
   });
 
-  it("devolve null quando todos cantaram e os times empataram em turnos", () => {
-    const players = lineup().map((one) => ({ ...one, spoke_count: 1 }));
-    expect(nextTurn(players, "blue")).toBeNull();
+  it("acabar e nao ter proximo turno sao a mesma coisa", () => {
+    const formacoes = [
+      [1, 1],
+      [2, 2],
+      [3, 2],
+      [3, 3],
+      [4, 4],
+    ];
+
+    formacoes.forEach(([red, blue]) => {
+      const squad = time(red, blue);
+      let anterior: Team | null = null;
+
+      for (let volta = 0; volta < 60; volta += 1) {
+        const acabou = isGameOver(squad);
+        const plano = nextTurn(squad, anterior);
+
+        expect(acabou).toBe(plano === null);
+
+        if (plano === null) break;
+
+        const cantor = squad.find((one) => one.id === plano.singerId);
+
+        if (cantor) cantor.spoke_count += 1;
+
+        anterior = plano.team;
+      }
+    });
   });
 
-  it("devolve null sem jogadores", () => {
-    expect(nextTurn([], null)).toBeNull();
+  it("todo mundo canta o mesmo tanto no fim", () => {
+    const squad = time(2, 2);
+    let anterior: Team | null = null;
+
+    for (let volta = 0; volta < 60; volta += 1) {
+      const plano = nextTurn(squad, anterior);
+
+      if (plano === null) break;
+
+      const cantor = squad.find((one) => one.id === plano.singerId);
+
+      if (cantor) cantor.spoke_count += 1;
+
+      anterior = plano.team;
+    }
+
+    expect(new Set(squad.map((one) => one.spoke_count)).size).toBe(1);
   });
 });
 
-describe("isGameOver", () => {
-  it("não encerra enquanto alguém não cantou", () => {
-    const players = lineup();
-    players[0].spoke_count = 1;
-    expect(isGameOver(players)).toBe(false);
-  });
-
-  it("não encerra com turnos desiguais entre os times", () => {
-    const players = [
-      player({ seat: 0, team: "red", spoke_count: 1 }),
-      player({ seat: 1, team: "red", spoke_count: 1 }),
-      player({ seat: 2, team: "blue", spoke_count: 1 }),
-    ];
-    expect(isGameOver(players)).toBe(false);
-  });
-
-  it("encerra quando todos cantaram e os turnos empataram", () => {
-    const players = [
-      player({ seat: 0, team: "red", spoke_count: 1 }),
-      player({ seat: 1, team: "red", spoke_count: 1 }),
-      player({ seat: 2, team: "blue", spoke_count: 2 }),
-    ];
-    expect(isGameOver(players)).toBe(true);
-  });
-
-  it("concorda com nextTurn: o jogo acaba exatamente quando não há próximo turno", () => {
-    const players = [
-      player({ seat: 0, team: "red", spoke_count: 1 }),
-      player({ seat: 1, team: "red", spoke_count: 1 }),
-      player({ seat: 2, team: "blue", spoke_count: 1 }),
-    ];
-    expect(nextTurn(players, "red")).not.toBeNull();
-    expect(isGameOver(players)).toBe(false);
-    players[2].spoke_count = 2;
-    expect(nextTurn(players, "blue")).toBeNull();
-    expect(isGameOver(players)).toBe(true);
-  });
-});
 
 describe("pickTwist", () => {
   it("devolve null quando nenhum modo está ativo", () => {

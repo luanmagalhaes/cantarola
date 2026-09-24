@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EmojiPicker } from "@/components/game/EmojiPicker";
+import { VoiceNote } from "@/components/ui/VoiceNote";
 import { useDraggable } from "@/hooks/useDraggable";
 import { useRecorder } from "@/hooks/useRecorder";
 import { api } from "@/lib/api/client";
@@ -265,18 +266,9 @@ export function ChatBubble({
                     )}
 
                     {message.kind === "audio" && message.audio_url ? (
-                      <audio
-                        controls
-                        preload="auto"
+                      <VoiceNote
                         src={message.audio_url}
-                        className="mt-0.5 h-9 w-52 max-w-full"
-                        onLoadedMetadata={(event) => {
-                          const player = event.currentTarget;
-
-                          if (player.currentTime > 0.05) {
-                            player.currentTime = 0;
-                          }
-                        }}
+                        seconds={message.audio_seconds ?? 1}
                       />
                     ) : (
                       <span className="block break-words text-sm font-bold leading-snug">
@@ -322,7 +314,10 @@ export function ChatBubble({
       <div className="border-grape/15 bg-paper shrink-0 border-t-2 p-2">
         {reviewing && recorder.take ? (
           <div className="flex flex-col gap-1.5">
-            <audio controls src={recorder.take.url} className="h-9 w-full" />
+            <VoiceNote
+              src={recorder.take.url}
+              seconds={recorder.take.seconds}
+            />
             <div className="flex gap-1.5">
               <button
                 type="button"

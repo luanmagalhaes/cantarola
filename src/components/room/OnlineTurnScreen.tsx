@@ -13,6 +13,7 @@ import { useRecorder } from "@/hooks/useRecorder";
 import { rivalOf } from "@/lib/game/rules";
 import { playAnthem, playSound, stopAnthem } from "@/lib/sound";
 import { TurnControls } from "@/components/room/TurnControls";
+import { VoiceNote } from "@/components/ui/VoiceNote";
 import type { Song } from "@/types/game";
 
 const takesIntervalMs = 2500;
@@ -369,11 +370,9 @@ export function OnlineTurnScreen({
                               {recorder.take.seconds}s está aqui. Pode mandar.
                             </p>
                           ) : (
-                            <audio
+                            <VoiceNote
                               src={recorder.take.url}
-                              controls
-                              className="w-full"
-                              onError={() => setPreviewBroken(true)}
+                              seconds={recorder.take.seconds}
                             />
                           )}
                           <div className="flex gap-2">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ReactionBar } from "@/components/room/ReactionBar";
+import { VoiceNote } from "@/components/ui/VoiceNote";
 import type { TakeView } from "@/lib/api/client";
 
 export interface GuessFeedback {
@@ -72,18 +73,10 @@ export function TakeList({
               </span>
             </div>
 
-            <audio
+            <VoiceNote
               src={take.audioUrl}
-              controls
-              preload="auto"
-              className="mt-2 w-full"
-              onLoadedMetadata={(event) => {
-                const player = event.currentTarget;
-
-                if (player.currentTime > 0.05) {
-                  player.currentTime = 0;
-                }
-              }}
+              seconds={take.seconds}
+              tone={take.solved ? "light" : "dark"}
             />
 
             <ReactionBar
