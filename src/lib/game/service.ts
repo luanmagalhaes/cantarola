@@ -42,10 +42,15 @@ function fail(status: number): never {
 }
 
 async function freeCode(): Promise<string> {
+  await serverClient().rpc("ll_free_slots", { keep: 8 });
+
   const { data, error } = await serverClient().rpc("ll_generate_code");
 
   if (error || typeof data !== "string") {
-    fail(500);
+    throw new ServiceError(
+      503,
+      "Todas as salas estão ocupadas agora. Tente de novo em um minuto.",
+    );
   }
 
   return data;
@@ -160,6 +165,11 @@ export async function joinRoom(code: string, rawName: string) {
   }
 
   const token = await createSecret((player as PlayerRow).id);
+
+  await serverClient()
+    .from("ll_rooms")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", room.id);
 
   return { code: room.code, token, playerId: (player as PlayerRow).id };
 }
