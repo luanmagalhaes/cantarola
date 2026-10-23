@@ -35,8 +35,8 @@ const tones = [
   { key: "5", swatch: "✋🏿" },
 ];
 
-const recentKey = "la-la-la.emojis.recent";
-const toneKey = "la-la-la.emojis.tone";
+const recentKey = "cantarola.emojis.recent";
+const toneKey = "cantarola.emojis.tone";
 const maxRecent = 24;
 
 function plain(value: string): string {

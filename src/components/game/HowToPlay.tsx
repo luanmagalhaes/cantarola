@@ -54,7 +54,7 @@ const slides: Slide[] = [
       <div className="flex flex-col gap-3 text-center">
         <p className="text-base font-bold leading-snug">
           Você recebe {songsPerTurn} músicas e cantarola cada uma{" "}
-          <Bad>só com lá lá lá</Bad>. Seu time tem que gritar o nome.
+          <Bad>só com a melodia</Bad>. Seu time tem que gritar o nome.
         </p>
         <div className="bg-lemon stroke-hard rounded-2xl p-3">
           <p className="font-display text-xl uppercase leading-tight">
@@ -69,8 +69,8 @@ const slides: Slide[] = [
             Cantar junto já vale
           </p>
           <p className="mt-1 text-xs font-bold">
-            No presencial ninguém precisa dizer o título. Se o time sacou pelo
-            lá lá lá e emendou na música, <Good>é ponto</Good>.
+            No presencial ninguém precisa dizer o título. Se o time sacou pela
+            melodia e emendou na música, <Good>é ponto</Good>.
           </p>
         </div>
         <p className="text-sm font-bold leading-snug opacity-80">

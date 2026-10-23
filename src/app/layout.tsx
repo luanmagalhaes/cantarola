@@ -17,12 +17,12 @@ const body = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Lá Lá Lá",
-  description: "Cantarole a música só com lá lá lá e faça seu time acertar.",
-  applicationName: "Lá Lá Lá",
+  title: "Cantarolá",
+  description: "Cantarole a música sem falar a letra e faça seu time acertar.",
+  applicationName: "Cantarolá",
   appleWebApp: {
     capable: true,
-    title: "Lá Lá Lá",
+    title: "Cantarolá",
     statusBarStyle: "black-translucent",
   },
 };

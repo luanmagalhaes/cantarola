@@ -1,6 +1,6 @@
-# Lá Lá Lá
+# Cantarolá
 
-Party game musical. Um jogador cantarola uma música sem dizer a letra — só "lá lá lá" — e o time tenta adivinhar qual é. Dois times, vermelho e azul. Ganha quem somar mais pontos.
+Party game musical. Um jogador cantarola uma música sem dizer a letra, só a melodia, e o time tenta adivinhar qual é. Dois times, vermelho e azul. Ganha quem somar mais pontos.
 
 O jogo tem duas versões, escolhidas na primeira tela. Elas mudam o fluxo inteiro a partir dali.
 
@@ -10,7 +10,7 @@ Todo mundo na mesma sala, um aparelho por pessoa. 45 segundos por turno.
 
 1. O cantor da vez recebe 8 músicas, distribuídas em 2 cartas de 4.
 2. Ele lê as músicas na tela dele. Ninguém mais vê.
-3. O cronômetro de 45s começa. Ele cantarola usando só a sílaba "lá".
+3. O cronômetro de 45s começa. Ele cantarola só a melodia, sem falar a letra.
 4. O time dele grita os palpites em voz alta. O cantor marca cada acerto na tela e passa para a próxima.
 5. Acabou o tempo: as músicas não acertadas vão para a fase de roubo.
 6. O time adversário tenta adivinhar as que sobraram. Cada uma que acertar vale ponto para ele.
@@ -48,7 +48,7 @@ O dono da sala liga os modos na criação da sala. A cada rodada, um deles é so
 
 | Modo | Efeito |
 |---|---|
-| Assovio (`whistle`) | a rodada inteira é assoviada, sem "lá" |
+| Assovio (`whistle`) | a rodada inteira é assoviada, sem cantarolar |
 | Boca fechada (`hum`) | só "hummm", boca fechada |
 | Bomba (`bomb`) | uma das músicas do turno vale 2 pontos, revelada só no fim |
 | Duelo (`duel`) | os dois times respondem ao mesmo tempo, quem acertar primeiro leva |

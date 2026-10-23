@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Lá Lá Lá",
-    short_name: "Lá Lá Lá",
+    name: "Cantarolá",
+    short_name: "Cantarolá",
     description:
-      "Party game musical: cantarole a música usando só a sílaba lá e faça seu time adivinhar antes do tempo acabar.",
+      "Party game musical: cantarole só a melodia, sem falar a letra, e faça seu time adivinhar antes do tempo acabar.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

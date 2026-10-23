@@ -1,8 +1,8 @@
 export const copy = {
   brand: {
-    name: "Lá Lá Lá",
-    firstLine: "LÁ LÁ",
-    secondLine: "LÁ",
+    name: "Cantarolá",
+    firstLine: "CANTA",
+    secondLine: "ROLÁ",
     tagline: "Cantarole, ninguém precisa afinar",
   },
   splash: {
@@ -58,7 +58,7 @@ export const copy = {
   twists: {
     whistle: {
       name: "Só assovio",
-      description: "Nada de lá lá lá. Nessa rodada é assovio puro.",
+      description: "Nada de cantarolar. Nessa rodada é assovio puro.",
     },
     hum: {
       name: "Boca fechada",

@@ -6,8 +6,8 @@ export interface Session {
   playerId: string;
 }
 
-const key = "la-la-la:session";
-const tutorialKey = "la-la-la:tutorial";
+const key = "cantarola:session";
+const tutorialKey = "cantarola:tutorial";
 
 const listeners = new Set<() => void>();
 

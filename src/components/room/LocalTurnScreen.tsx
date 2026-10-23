@@ -186,7 +186,7 @@ export function LocalTurnScreen({
             </p>
             <p className="mt-2 text-sm font-bold leading-snug opacity-80">
               {isSinger
-                ? "Só você vê a lista. Cante com lá lá lá, sem falar o nome nem a letra. Se o time cantar junto, já vale o ponto."
+                ? "Só você vê a lista. Cantarole só a melodia, sem falar o nome nem a letra. Se o time cantar junto, já vale o ponto."
                 : "Fique de olho no celular de quem canta só depois que acabar."}
             </p>
           </div>

@@ -38,7 +38,7 @@ const volumes: Record<SoundName, number> = {
   win: 0.7,
 };
 
-const mutedKey = "la-la-la:muted";
+const mutedKey = "cantarola:muted";
 
 const listeners = new Set<() => void>();
 const elements = new Map<SoundName, HTMLAudioElement>();

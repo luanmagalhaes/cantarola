@@ -1,4 +1,4 @@
-# Lá Lá Lá — estado da construção
+# Cantarolá: estado da construção
 
 Documento de trabalho. Atualizar conforme avança.
 
@@ -6,8 +6,8 @@ Documento de trabalho. Atualizar conforme avança.
 
 | Tema | Decisão |
 |---|---|
-| Nome | Lá Lá Lá (igual ao original), repo privado |
-| Paleta | a do LaLaLa: uva `#512664`, limão `#f0dc05`, ouro `#fab200`, âmbar `#ffbd1b`, coral `#eb5c5a`, creme `#fffbc4` |
+| Nome | Cantarolá, repo privado |
+| Paleta | uva `#512664`, limão `#f0dc05`, ouro `#fab200`, âmbar `#ffbd1b`, coral `#eb5c5a`, creme `#fffbc4` |
 | Porta dev | 2001 |
 | Prefixo do banco | `ll_` |
 | Código da sala | 2 números, reciclagem de 24h |
