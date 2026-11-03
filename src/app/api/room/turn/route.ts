@@ -6,10 +6,13 @@ import {
   roomByCode,
 } from "@/app/api/_shared";
 import {
+  chooseSinger,
   closeTurn,
+  endMatch,
   endStealPhase,
   markSong,
   pauseTurn,
+  reopenPick,
   resumeTurn,
   startTurn,
   undoLastResult,
@@ -18,6 +21,9 @@ import { songById } from "@/data/songs";
 import type { Outcome } from "@/types/game";
 
 type Action =
+  | "pick"
+  | "unpick"
+  | "end"
   | "start"
   | "mark"
   | "close"
@@ -32,6 +38,7 @@ interface Body {
   action?: Action;
   songId?: string;
   outcome?: Outcome;
+  singerId?: string;
 }
 
 export async function POST(request: Request) {
@@ -44,6 +51,21 @@ export async function POST(request: Request) {
 
     const room = await roomByCode(payload.code);
     const me = await playerByToken(room.id, payload.token);
+
+    if (payload.action === "pick" && payload.singerId) {
+      await chooseSinger(room, me, payload.singerId);
+      return { ok: true };
+    }
+
+    if (payload.action === "unpick") {
+      await reopenPick(room, me);
+      return { ok: true };
+    }
+
+    if (payload.action === "end") {
+      await endMatch(room, me);
+      return { ok: true };
+    }
 
     if (payload.action === "start") {
       await startTurn(room, me);

@@ -4,6 +4,7 @@ import type {
   ResultRow,
   Score,
   Team,
+  TurnSongRow,
   Twist,
 } from "@/types/game";
 
@@ -11,13 +12,7 @@ export const teams: Team[] = ["red", "blue"];
 export const minPlayers = 2;
 export const maxPlayers = 16;
 export const codeLength = 2;
-export const songsPerTurn = 8;
-export const targetTurns = 6;
-
-export interface NextTurn {
-  singerId: string;
-  team: Team;
-}
+export const bombReach = 5;
 
 export function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
@@ -35,7 +30,7 @@ export function rivalOf(team: Team): Team {
 }
 
 export function pointsFor(outcome: Outcome, isBomb: boolean): number {
-  if (outcome === "missed") return 0;
+  if (outcome === "missed" || outcome === "skipped") return 0;
   return isBomb ? 2 : 1;
 }
 
@@ -112,79 +107,50 @@ export function turnsTaken(players: PlayerRow[], team: Team): number {
   );
 }
 
-export function roundsFor(players: PlayerRow[]): number {
-  const singers = players.filter((player) => player.team !== null).length;
-
-  if (singers === 0) {
-    return 1;
-  }
-
-  return Math.max(1, Math.ceil(targetTurns / singers));
+export function canSing(player: PlayerRow | undefined): boolean {
+  return Boolean(player && player.team !== null);
 }
 
-function pendingSingers(players: PlayerRow[], team: Team): PlayerRow[] {
-  const rounds = roundsFor(players);
-
-  return squadOf(players, team).filter(
-    (player) => player.spoke_count < rounds,
-  );
-}
-
-function everyonePlayed(players: PlayerRow[]): boolean {
-  return teams.every((team) => pendingSingers(players, team).length === 0);
-}
-
-function firstPendingOf(players: PlayerRow[], team: Team): PlayerRow | null {
-  const queue = [...pendingSingers(players, team)].sort(
-    (one, other) =>
-      one.spoke_count - other.spoke_count || one.seat - other.seat,
-  );
-  return queue.length > 0 ? queue[0] : null;
-}
-
-function teamOwedTurn(players: PlayerRow[]): Team | null {
+export function teamBehind(players: PlayerRow[]): Team | null {
   const red = turnsTaken(players, "red");
   const blue = turnsTaken(players, "blue");
-  if (red === blue) return null;
-  const owed: Team = red < blue ? "red" : "blue";
-  return squadOf(players, owed).length > 0 ? owed : null;
-}
 
-function leastUsedSinger(players: PlayerRow[], team: Team): PlayerRow | null {
-  const squad = squadOf(players, team);
-  if (squad.length === 0) return null;
-  const fewest = Math.min(...squad.map((player) => player.spoke_count));
-  const candidates = squad
-    .filter((player) => player.spoke_count === fewest)
-    .sort((one, other) => one.seat - other.seat);
-  return candidates[0];
-}
-
-function preferredTeam(players: PlayerRow[], previousTeam: Team | null): Team {
-  if (previousTeam !== null) return rivalOf(previousTeam);
-  return teamOwedTurn(players) ?? "red";
-}
-
-export function nextTurn(
-  players: PlayerRow[],
-  previousTeam: Team | null,
-): NextTurn | null {
-  if (!everyonePlayed(players)) {
-    const preferred = preferredTeam(players, previousTeam);
-    for (const team of [preferred, rivalOf(preferred)]) {
-      const singer = firstPendingOf(players, team);
-      if (singer !== null) return { singerId: singer.id, team };
-    }
+  if (red === blue) {
     return null;
   }
-  const owed = teamOwedTurn(players);
-  if (owed === null) return null;
-  const singer = leastUsedSinger(players, owed);
-  return singer === null ? null : { singerId: singer.id, team: owed };
+
+  return red < blue ? "red" : "blue";
 }
 
-export function isGameOver(players: PlayerRow[]): boolean {
-  return everyonePlayed(players) && teamOwedTurn(players) === null;
+export function currentSongOf(
+  rows: TurnSongRow[],
+  recorded: Set<string> = new Set(),
+): TurnSongRow | null {
+  const latest = [...rows].sort(
+    (one, other) => other.position - one.position,
+  )[0];
+
+  if (!latest || latest.outcome !== null || recorded.has(latest.song_id)) {
+    return null;
+  }
+
+  return latest;
+}
+
+export function pileOrder<T extends { id: string }>(
+  pool: readonly T[],
+  resting: ReadonlySet<string>,
+): T[] {
+  const shuffled = shuffle([...pool]);
+
+  return [
+    ...shuffled.filter((song) => !resting.has(song.id)),
+    ...shuffled.filter((song) => resting.has(song.id)),
+  ];
+}
+
+export function pickBombPosition(): number {
+  return Math.floor(Math.random() * bombReach);
 }
 
 export function pickTwist(enabled: Twist[]): Twist | null {

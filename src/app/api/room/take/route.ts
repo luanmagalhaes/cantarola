@@ -9,6 +9,7 @@ import {
   turnSongs,
   type TakeRow,
 } from "@/app/api/_shared";
+import { currentSongFor, dealNextSong, onClock } from "@/lib/game/service";
 import { ServiceError } from "@/lib/messages";
 import { serverClient } from "@/lib/supabase/server";
 
@@ -91,11 +92,14 @@ export async function POST(request: Request) {
       reject(403);
     }
 
-    const songs = await turnSongs(turn.id);
-    const target = songs.find((row) => row.song_id === songId);
+    if (turn.status !== "running") {
+      throw new ServiceError(409, "A gravação dessa vez já fechou.");
+    }
 
-    if (!target || target.outcome !== null) {
-      reject(409);
+    const current = await currentSongFor(room, turn, await turnSongs(turn.id));
+
+    if (current?.song_id !== songId) {
+      throw new ServiceError(409, "Essa música já saiu da sua vez.");
     }
 
     const client = serverClient();
@@ -130,6 +134,10 @@ export async function POST(request: Request) {
 
     if (!take) {
       reject(500);
+    }
+
+    if (onClock(turn)) {
+      await dealNextSong(room, turn);
     }
 
     return {

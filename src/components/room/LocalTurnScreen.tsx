@@ -1,20 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SongCard } from "@/components/game/SongCard";
-import { PreviewGate } from "@/components/game/PreviewGate";
+import { NowSinging } from "@/components/game/NowSinging";
 import { TurnControls } from "@/components/room/TurnControls";
 import { TurnHeader } from "@/components/game/TurnHeader";
 import { Button } from "@/components/ui/Button";
 import { api, type RoomState } from "@/lib/api/client";
 import { copy } from "@/data/copy";
 import { leftMsFor, useNow } from "@/hooks/useNow";
-import { rivalOf } from "@/lib/game/rules";
-import { playAnthem, playSound, stopAnthem } from "@/lib/sound";
-import type { Outcome, Song, Team } from "@/types/game";
+import { nameOf } from "@/lib/game/players";
+import { isOneOnOne, rivalOf } from "@/lib/game/rules";
+import { playSound } from "@/lib/sound";
+import type { Outcome, Team } from "@/types/game";
 
-function nameOf(state: RoomState, id: string | null | undefined) {
-  return state.players.find((player) => player.id === id)?.name ?? "alguém";
+const teamButtons: Record<Team, string> = {
+  red: "bg-team-red text-paper",
+  blue: "bg-team-blue text-paper",
+};
+
+function soundFor(outcome: Outcome) {
+  if (outcome === "hit") {
+    return "right";
+  }
+
+  return outcome === "stolen" ? "steal" : "miss";
 }
 
 export function LocalTurnScreen({
@@ -24,11 +33,10 @@ export function LocalTurnScreen({
 }: {
   state: RoomState;
   token: string;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void> | void;
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<Song | null>(null);
   const lastResultId = useRef<string | null>(null);
   const closing = useRef(false);
 
@@ -38,6 +46,7 @@ export function LocalTurnScreen({
   const now = useNow(Boolean(running));
 
   const team = (turn?.team ?? "red") as Team;
+  const rival = rivalOf(team);
   const paused = running && Boolean(turn?.paused_at);
   const leftMs = leftMsFor(
     turn?.ends_at,
@@ -51,7 +60,12 @@ export function LocalTurnScreen({
   const secondsLeft = Math.min(rawLeft, room.turn_seconds);
   const warmingUp = running && rawLeft > room.turn_seconds;
   const timeUp = running && !paused && rawLeft <= 0;
-  const pending = songs.filter((row) => row.outcome === null);
+  const current = songs.find((row) => row.songId === state.currentSongId);
+  const stealTarget = songs.find((row) => row.outcome === null);
+  const hits = songs.filter((row) => row.outcome === "hit").length;
+  const skipped = songs.filter((row) => row.outcome === "skipped").length;
+  const settled = songs.filter((row) => row.outcome !== null).length;
+  const duel = turn?.twist === "duel" && !isOneOnOne(state.players);
 
   useEffect(() => {
     const last = state.results.at(-1);
@@ -67,13 +81,7 @@ export function LocalTurnScreen({
       return;
     }
 
-    playSound(
-      last.outcome === "hit"
-        ? "right"
-        : last.outcome === "stolen"
-          ? "steal"
-          : "miss",
-    );
+    playSound(soundFor(last.outcome));
   }, [state.results, isSinger]);
 
   useEffect(() => {
@@ -85,7 +93,13 @@ export function LocalTurnScreen({
   }, [turn?.twist]);
 
   useEffect(() => {
-    if (!running || warmingUp || paused || secondsLeft > 10 || secondsLeft <= 0) {
+    if (
+      !running ||
+      warmingUp ||
+      paused ||
+      secondsLeft > 10 ||
+      secondsLeft <= 0
+    ) {
       return;
     }
 
@@ -97,7 +111,7 @@ export function LocalTurnScreen({
       return;
     }
 
-    void playAnthem();
+    playSound("timeup");
   }, [timeUp]);
 
   useEffect(() => {
@@ -129,18 +143,19 @@ export function LocalTurnScreen({
     try {
       setError("");
       await action();
-      onRefresh();
+      await onRefresh();
     } catch (failure) {
       setError(
         failure instanceof Error ? failure.message : copy.errors.generic,
       );
+      await onRefresh();
     } finally {
       setBusy(false);
     }
   }
 
   function mark(songId: string, outcome: Outcome) {
-    playSound(outcome === "hit" ? "right" : outcome === "stolen" ? "steal" : "miss");
+    playSound(soundFor(outcome));
     void dispatch(() => api.markSong(room.code, token, songId, outcome));
   }
 
@@ -151,13 +166,14 @@ export function LocalTurnScreen({
   return (
     <main className="confetti-dots bg-cream flex min-h-dvh flex-col items-center gap-4 px-5 pb-[calc(2rem+var(--safe-bottom))] pt-[calc(3.5rem+var(--safe-top))]">
       <TurnHeader
-        singerName={nameOf(state, turn.singer_id)}
+        singerName={nameOf(state.players, turn.singer_id)}
         team={team}
         twist={turn.twist}
         secondsLeft={secondsLeft}
         totalSeconds={room.turn_seconds}
         warmingUp={Boolean(warmingUp)}
         score={score}
+        players={state.players}
       />
 
       {paused ? (
@@ -182,12 +198,12 @@ export function LocalTurnScreen({
             <p className="font-display text-grape text-2xl uppercase leading-tight">
               {isSinger
                 ? "Sua vez de cantarolar"
-                : `${nameOf(state, turn.singer_id)} vai cantarolar`}
+                : `${nameOf(state.players, turn.singer_id)} vai cantarolar`}
             </p>
             <p className="mt-2 text-sm font-bold leading-snug opacity-80">
               {isSinger
-                ? "Só você vê a lista. Cantarole só a melodia, sem falar o nome nem a letra. Se o time cantar junto, já vale o ponto."
-                : "Fique de olho no celular de quem canta só depois que acabar."}
+                ? "Aparece uma música por vez, só pra você. Cantarole só a melodia. Esqueceu como é? Abra a letra. Não conhece? Passa e vem outra."
+                : "Quando o tempo começar, grite o nome da música."}
             </p>
           </div>
 
@@ -195,10 +211,9 @@ export function LocalTurnScreen({
             <Button
               color="coral"
               disabled={busy}
-              onClick={() => {
-                stopAnthem();
-                void dispatch(() => api.startTurn(room.code, token));
-              }}
+              onClick={() =>
+                void dispatch(() => api.startTurn(room.code, token))
+              }
             >
               Começar os {room.turn_seconds}s
             </Button>
@@ -207,6 +222,19 @@ export function LocalTurnScreen({
               Esperando começar
             </p>
           )}
+
+          {state.me.is_host ? (
+            <Button
+              size="sm"
+              color="paper"
+              disabled={busy}
+              onClick={() =>
+                void dispatch(() => api.changeSinger(room.code, token))
+              }
+            >
+              Trocar quem canta
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -216,105 +244,126 @@ export function LocalTurnScreen({
             Hora do roubo
           </p>
           <p className="text-paper mt-1 text-xs font-bold leading-snug">
-            Time {copy.teams[rivalOf(team)]} tenta as que sobraram. Quem cantou
+            Time {copy.teams[rival]} tenta acertar a última música. Quem cantou
             marca o resultado.
           </p>
         </div>
       ) : null}
 
-      {isSinger && (running || stealing) ? (
-        <>
-          <ul className="flex w-full max-w-sm flex-col gap-2">
-            {songs.map((row, index) => (
-              <SongCard
-                key={row.songId}
-                song={row.song}
-                outcome={row.outcome}
-                index={index}
-                isBomb={turn.bomb_song_id === row.songId}
-                actions={
-                  row.outcome === null ? (
-                    <>
-                      {stealing ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => mark(row.songId, "stolen")}
-                            className="font-display bg-team-blue text-paper stroke-thin flex-1 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-50"
-                          >
-                            Roubou
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => mark(row.songId, "missed")}
-                            className="font-display bg-cream text-grape stroke-thin flex-1 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-50"
-                          >
-                            Ninguém
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => mark(row.songId, "hit")}
-                            className="font-display bg-mint text-paper stroke-thin flex-1 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-50"
-                          >
-                            Acertou
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => mark(row.songId, "missed")}
-                            className="font-display bg-cream text-grape stroke-thin flex-1 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-50"
-                          >
-                            Passar
-                          </button>
-                          {row.song ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreview(row.song)}
-                              aria-label={`${copy.preview.button}: ${row.song.title}`}
-                              className="font-display bg-gold text-grape stroke-thin rounded-lg px-2.5 py-1.5 text-sm uppercase disabled:opacity-50"
-                            >
-                              ♪
-                            </button>
-                          ) : null}
-                        </>
-                      )}
-                    </>
-                  ) : null
-                }
-              />
-            ))}
-          </ul>
-
-          <div className="flex w-full max-w-sm flex-col gap-2">
-            {stealing ? (
-              <Button
-                size="sm"
-                className="max-w-sm"
-                color="grape"
-                disabled={busy}
-                onClick={() => void dispatch(() => api.endSteal(room.code, token))}
-              >
-                Encerrar o roubo
-              </Button>
+      {isSinger && running ? (
+        current?.song ? (
+          <NowSinging
+            key={current.songId}
+            song={current.song}
+            number={songs.length}
+            withLyrics
+          >
+            {duel ? (
+              <div className="grid grid-cols-2 gap-2">
+                {([team, rival] as const).map((side) => (
+                  <button
+                    key={side}
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      mark(current.songId, side === team ? "hit" : "stolen")
+                    }
+                    className={`font-display stroke-hard rounded-2xl px-2 py-3 text-lg uppercase leading-tight disabled:opacity-50 ${teamButtons[side]}`}
+                  >
+                    {copy.teams[side]} acertou
+                  </button>
+                ))}
+              </div>
             ) : (
               <Button
-                size="sm"
-                className="max-w-sm"
-                color="grape"
-                disabled={busy || pending.length === songs.length}
-                onClick={() => void dispatch(() => api.closeTurn(room.code, token))}
+                color="mint"
+                disabled={busy}
+                onClick={() => mark(current.songId, "hit")}
               >
-                Acabei antes do tempo
+                Acertou
               </Button>
             )}
+            <Button
+              size="sm"
+              color="paper"
+              disabled={busy}
+              onClick={() => mark(current.songId, "skipped")}
+            >
+              Passar
+            </Button>
+          </NowSinging>
+        ) : (
+          <div className="bg-paper stroke-hard hard-shadow w-full max-w-sm rounded-2xl px-4 py-5 text-center">
+            <p className="font-display text-grape text-2xl uppercase leading-tight">
+              {timeUp ? "Acabou o tempo" : "Puxando a próxima"}
+            </p>
           </div>
-        </>
+        )
+      ) : null}
+
+      {isSinger && running ? (
+        <div className="flex w-full max-w-sm flex-col gap-2">
+          <p className="font-display text-grape text-center text-sm uppercase opacity-80">
+            {hits} {hits === 1 ? "acerto" : "acertos"} · {skipped}{" "}
+            {skipped === 1 ? "passada" : "passadas"}
+          </p>
+          <Button
+            size="sm"
+            color="grape"
+            disabled={busy || settled === 0}
+            onClick={() => void dispatch(() => api.closeTurn(room.code, token))}
+          >
+            Encerrar minha vez
+          </Button>
+        </div>
+      ) : null}
+
+      {isSinger && stealing ? (
+        stealTarget?.song ? (
+          <NowSinging
+            key={stealTarget.songId}
+            song={stealTarget.song}
+            number={songs.length}
+          >
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => mark(stealTarget.songId, "stolen")}
+              className={`font-display stroke-hard rounded-2xl px-2 py-3 text-xl uppercase leading-tight disabled:opacity-50 ${teamButtons[rival]}`}
+            >
+              {copy.teams[rival]} roubou
+            </button>
+            <Button
+              size="sm"
+              color="paper"
+              disabled={busy}
+              onClick={() => mark(stealTarget.songId, "missed")}
+            >
+              Ninguém acertou
+            </Button>
+          </NowSinging>
+        ) : (
+          <Button
+            size="sm"
+            color="grape"
+            disabled={busy}
+            onClick={() => void dispatch(() => api.endSteal(room.code, token))}
+          >
+            Encerrar o roubo
+          </Button>
+        )
+      ) : null}
+
+      {!isSinger && stealing && state.me.is_host ? (
+        <Button
+          size="sm"
+          color="grape"
+          className="max-w-sm"
+          disabled={busy}
+          onClick={() => void dispatch(() => api.endSteal(room.code, token))}
+        >
+          Encerrar o roubo
+        </Button>
       ) : null}
 
       {!isSinger && (running || stealing) ? (
@@ -327,37 +376,24 @@ export function LocalTurnScreen({
               🎤
             </p>
             <p className="font-display text-grape mt-2 text-2xl uppercase leading-tight">
-              Grita o nome da música
+              {stealing && state.me.team === rival
+                ? "Rouba essa!"
+                : "Grita o nome da música"}
             </p>
             <p className="mt-2 text-sm font-bold leading-snug opacity-80">
-              A lista fica escondida de você. Quem canta marca quem acertou.
+              A música fica escondida de você. Quem canta marca quem acertou.
             </p>
           </div>
 
           <div className="bg-grape w-full rounded-2xl px-4 py-3 text-center">
             <p className="font-display text-lemon text-4xl leading-none">
-              {songs.filter((row) => row.outcome === "hit").length}
-              <span className="text-lg"> / {songs.length}</span>
+              {hits}
             </p>
             <p className="font-display text-lemon mt-1 text-xs uppercase tracking-wider opacity-80">
-              acertadas até agora
+              {hits === 1 ? "acertada até agora" : "acertadas até agora"}
             </p>
           </div>
         </div>
-      ) : null}
-
-      {turn.status === "done" ? (
-        <ul className="flex w-full max-w-sm flex-col gap-2">
-          {songs.map((row, index) => (
-            <SongCard
-              key={row.songId}
-              song={row.song}
-              outcome={row.outcome}
-              index={index}
-              isBomb={turn.bomb_song_id === row.songId}
-            />
-          ))}
-        </ul>
       ) : null}
 
       {error ? (
@@ -369,9 +405,6 @@ export function LocalTurnScreen({
         </p>
       ) : null}
 
-      {preview ? (
-        <PreviewGate song={preview} onClose={() => setPreview(null)} />
-      ) : null}
     </main>
   );
 }

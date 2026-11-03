@@ -6,7 +6,8 @@ import type { Outcome, Song } from "@/types/game";
 const outcomeStyles: Record<Outcome, { background: string; label: string }> = {
   hit: { background: "bg-mint text-paper", label: "acertou" },
   stolen: { background: "bg-team-blue text-paper", label: "roubada" },
-  missed: { background: "bg-grape/30 text-grape", label: "passou" },
+  missed: { background: "bg-grape/30 text-grape", label: "ninguém acertou" },
+  skipped: { background: "bg-paper/60 text-grape/70", label: "passou" },
 };
 
 export function SongCard({

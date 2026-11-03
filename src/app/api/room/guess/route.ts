@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       return { correct: false, song: null };
     }
 
-    const outcome = isRival ? "stolen" : "hit";
+    const outcome = isRival && !alone ? "stolen" : "hit";
     const bombSongId = await bombSongIdFor(turn, []);
 
     await client

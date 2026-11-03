@@ -7,6 +7,7 @@ import { ChatBubble } from "@/components/room/ChatBubble";
 import { LeaveButton } from "@/components/room/LeaveButton";
 import { LobbyScreen } from "@/components/room/LobbyScreen";
 import { LocalTurnScreen } from "@/components/room/LocalTurnScreen";
+import { NextSingerScreen } from "@/components/room/NextSingerScreen";
 import { OnlineTurnScreen } from "@/components/room/OnlineTurnScreen";
 import { VictoryScreen } from "@/components/room/VictoryScreen";
 import { Button } from "@/components/ui/Button";
@@ -88,6 +89,7 @@ export function RoomApp({ code }: { code: string }) {
   }
 
   const online = state.room.play_mode === "online";
+  const picking = !state.turn || state.turn.status === "done";
 
   return (
     <>
@@ -107,7 +109,9 @@ export function RoomApp({ code }: { code: string }) {
       ) : null}
 
       {state.room.status === "playing" ? (
-        online ? (
+        picking ? (
+          <NextSingerScreen state={state} token={token} onRefresh={refresh} />
+        ) : online ? (
           <OnlineTurnScreen state={state} token={token} onRefresh={refresh} />
         ) : (
           <LocalTurnScreen state={state} token={token} onRefresh={refresh} />

@@ -113,7 +113,6 @@ export function useRecorder(maxSeconds: number) {
 
         void (async () => {
           const measured = await measureDuration(raw);
-          const trueMs = measured ?? heldMs;
 
           const sane =
             measured !== null && heldMs > 0 && measured >= heldMs * 0.6;

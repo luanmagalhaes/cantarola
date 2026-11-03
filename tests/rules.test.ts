@@ -1,28 +1,37 @@
 import { describe, expect, it } from "vitest";
 import {
   assignTeams,
+  bombReach,
+  canSing,
   canStart,
   codeLength,
-  isGameOver,
+  currentSongOf,
   maxPlayers,
   minPlayers,
-  nextTurn,
+  pickBombPosition,
   pickTwist,
+  pileOrder,
   pointsFor,
   rivalOf,
   scoreFrom,
   scoringTeamFor,
   shuffle,
-  songsPerTurn,
+  teamBehind,
   teams,
   teamsBalanced,
   isOneOnOne,
-  roundsFor,
   turnsTaken,
   winnerOf,
   withoutTeam,
 } from "@/lib/game/rules";
-import type { PlayerRow, ResultRow, Team, Twist } from "@/types/game";
+import type {
+  Outcome,
+  PlayerRow,
+  ResultRow,
+  Team,
+  TurnSongRow,
+  Twist,
+} from "@/types/game";
 
 function player(overrides: Partial<PlayerRow> = {}): PlayerRow {
   const seat = overrides.seat ?? 0;
@@ -63,6 +72,15 @@ function lineup(): PlayerRow[] {
   ];
 }
 
+function song(position: number, outcome: Outcome | null = null): TurnSongRow {
+  return {
+    turn_id: "turn-test",
+    song_id: `song-${position}`,
+    position,
+    outcome,
+  };
+}
+
 function repeat(times: number, run: () => string): Set<string> {
   const seen = new Set<string>();
   for (let index = 0; index < times; index += 1) seen.add(run());
@@ -79,9 +97,8 @@ describe("constantes da partida", () => {
     expect(maxPlayers).toBe(16);
   });
 
-  it("usa código de 2 dígitos e 8 músicas por turno", () => {
+  it("usa código de 2 dígitos", () => {
     expect(codeLength).toBe(2);
-    expect(songsPerTurn).toBe(8);
   });
 });
 
@@ -111,6 +128,11 @@ describe("pointsFor", () => {
     expect(pointsFor("missed", false)).toBe(0);
     expect(pointsFor("missed", true)).toBe(0);
   });
+
+  it("não dá ponto para música passada, nem se for a bomba", () => {
+    expect(pointsFor("skipped", false)).toBe(0);
+    expect(pointsFor("skipped", true)).toBe(0);
+  });
 });
 
 describe("scoringTeamFor", () => {
@@ -126,6 +148,10 @@ describe("scoringTeamFor", () => {
 
   it("não credita ninguém quando a música passa em branco", () => {
     expect(scoringTeamFor("missed", "red")).toBeNull();
+  });
+
+  it("não credita ninguém quando quem canta passa a música", () => {
+    expect(scoringTeamFor("skipped", "blue")).toBeNull();
   });
 });
 
@@ -307,111 +333,62 @@ describe("turnsTaken", () => {
   });
 });
 
-describe("nextTurn e fim de partida", () => {
-  const time = (red: number, blue: number, cantou = 0) => [
-    ...Array.from({ length: red }, (_, i) =>
-      player({ seat: i, team: "red", spoke_count: cantou }),
-    ),
-    ...Array.from({ length: blue }, (_, i) =>
-      player({ seat: red + i, team: "blue", spoke_count: cantou }),
-    ),
-  ];
-
-  it("a dupla nao acaba na primeira rodada", () => {
-    const squad = time(1, 1);
-
-    expect(roundsFor(squad)).toBe(3);
-    expect(isGameOver(squad)).toBe(false);
-  });
-
-  it("a dupla so acaba quando os dois cantaram as tres vezes", () => {
-    expect(isGameOver(time(1, 1, 2))).toBe(false);
-    expect(isGameOver(time(1, 1, 3))).toBe(true);
-  });
-
-  it("grupo grande nao vira maratona", () => {
-    expect(roundsFor(time(4, 4))).toBe(1);
-    expect(roundsFor(time(3, 3))).toBe(1);
-    expect(roundsFor(time(2, 2))).toBe(2);
-  });
-
-  it("alterna os times a cada turno", () => {
-    const squad = time(2, 2);
-    const plano = nextTurn(squad, "red");
-
-    expect(plano?.team).toBe("blue");
-  });
-
-  it("chama primeiro quem cantou menos", () => {
-    const squad = [
+describe("teamBehind", () => {
+  it("aponta o time que cantou menos vezes", () => {
+    const players = [
       player({ seat: 0, team: "red", spoke_count: 2 }),
-      player({ seat: 1, team: "red", spoke_count: 0 }),
-      player({ seat: 2, team: "blue", spoke_count: 1 }),
+      player({ seat: 1, team: "blue", spoke_count: 0 }),
+      player({ seat: 2, team: "red", spoke_count: 0 }),
       player({ seat: 3, team: "blue", spoke_count: 1 }),
     ];
-
-    expect(nextTurn(squad, "blue")?.singerId).toBe("player-1");
+    expect(teamBehind(players)).toBe("blue");
   });
 
-  it("nao deixa o jogo travar quando um time ficou sem ninguem", () => {
-    const squad = [
-      player({ seat: 0, team: "red", spoke_count: 0 }),
-      player({ seat: 1, team: "red", spoke_count: 0 }),
-    ];
-
-    expect(nextTurn(squad, "red")?.team).toBe("red");
-  });
-
-  it("acabar e nao ter proximo turno sao a mesma coisa", () => {
-    const formacoes = [
-      [1, 1],
-      [2, 2],
-      [3, 2],
-      [3, 3],
-      [4, 4],
-    ];
-
-    formacoes.forEach(([red, blue]) => {
-      const squad = time(red, blue);
-      let anterior: Team | null = null;
-
-      for (let volta = 0; volta < 60; volta += 1) {
-        const acabou = isGameOver(squad);
-        const plano = nextTurn(squad, anterior);
-
-        expect(acabou).toBe(plano === null);
-
-        if (plano === null) break;
-
-        const cantor = squad.find((one) => one.id === plano.singerId);
-
-        if (cantor) cantor.spoke_count += 1;
-
-        anterior = plano.team;
-      }
-    });
-  });
-
-  it("todo mundo canta o mesmo tanto no fim", () => {
-    const squad = time(2, 2);
-    let anterior: Team | null = null;
-
-    for (let volta = 0; volta < 60; volta += 1) {
-      const plano = nextTurn(squad, anterior);
-
-      if (plano === null) break;
-
-      const cantor = squad.find((one) => one.id === plano.singerId);
-
-      if (cantor) cantor.spoke_count += 1;
-
-      anterior = plano.team;
-    }
-
-    expect(new Set(squad.map((one) => one.spoke_count)).size).toBe(1);
+  it("não aponta ninguém quando os times cantaram o mesmo tanto", () => {
+    expect(teamBehind(lineup())).toBeNull();
   });
 });
 
+describe("canSing", () => {
+  it("deixa cantar quem tem time", () => {
+    expect(canSing(player({ team: "red" }))).toBe(true);
+  });
+
+  it("não deixa cantar quem está sem time ou não existe", () => {
+    expect(canSing(player())).toBe(false);
+    expect(canSing(undefined)).toBe(false);
+  });
+});
+
+describe("currentSongOf", () => {
+  it("mostra só a última música puxada", () => {
+    const rows = [song(0, "hit"), song(2), song(1, "skipped")];
+    expect(currentSongOf(rows)?.song_id).toBe("song-2");
+  });
+
+  it("não mostra nada quando a última já foi resolvida", () => {
+    expect(currentSongOf([song(0, "skipped"), song(1, "hit")])).toBeNull();
+  });
+
+  it("não mostra música que já tem áudio gravado", () => {
+    expect(currentSongOf([song(0)], new Set(["song-0"]))).toBeNull();
+  });
+
+  it("não mostra nada antes da primeira música", () => {
+    expect(currentSongOf([])).toBeNull();
+  });
+});
+
+describe("pickBombPosition", () => {
+  it("coloca a bomba entre as primeiras músicas da vez", () => {
+    const positions = repeat(200, () => String(pickBombPosition()));
+    for (const position of positions) {
+      expect(Number(position)).toBeGreaterThanOrEqual(0);
+      expect(Number(position)).toBeLessThan(bombReach);
+    }
+    expect(positions.size).toBeGreaterThan(1);
+  });
+});
 
 describe("pickTwist", () => {
   it("devolve null quando nenhum modo está ativo", () => {
@@ -434,6 +411,50 @@ describe("pickTwist", () => {
   it("varia o modo sorteado entre execuções", () => {
     const enabled: Twist[] = ["whistle", "hum", "bomb", "duel"];
     const draws = repeat(60, () => pickTwist(enabled) ?? "none");
+    expect(draws.size).toBeGreaterThan(1);
+  });
+});
+
+describe("pileOrder", () => {
+  const deck = Array.from({ length: 10 }, (_, index) => ({
+    id: `song-${index}`,
+  }));
+
+  it("preserva todas as músicas do baralho", () => {
+    const pile = pileOrder(deck, new Set(["song-1", "song-5"]));
+    expect(pile.map((song) => song.id).sort()).toEqual(
+      deck.map((song) => song.id).sort(),
+    );
+  });
+
+  it("deixa as músicas descansando no fim da fila", () => {
+    const resting = new Set(["song-0", "song-3", "song-7"]);
+    const pile = pileOrder(deck, resting);
+    const tail = pile.slice(-resting.size).map((song) => song.id);
+
+    expect(new Set(tail)).toEqual(resting);
+    for (const song of pile.slice(0, -resting.size)) {
+      expect(resting.has(song.id)).toBe(false);
+    }
+  });
+
+  it("funciona quando nada está descansando", () => {
+    const pile = pileOrder(deck, new Set());
+    expect(pile).toHaveLength(deck.length);
+  });
+
+  it("funciona quando tudo está descansando", () => {
+    const resting = new Set(deck.map((song) => song.id));
+    const pile = pileOrder(deck, resting);
+    expect(pile).toHaveLength(deck.length);
+  });
+
+  it("embaralha a parte fresca entre execuções", () => {
+    const draws = repeat(60, () =>
+      pileOrder(deck, new Set())
+        .map((song) => song.id)
+        .join("-"),
+    );
     expect(draws.size).toBeGreaterThan(1);
   });
 });
@@ -497,28 +518,12 @@ describe("um contra um", () => {
     expect(scoringTeamFor("missed", "red", true)).toBeNull();
   });
 
-  it("os dois lados pontuam ao longo da partida", () => {
-    const beneficiados = new Set<string>();
-    const squad = duo.map((one) => ({ ...one }));
-    let previous: Team | null = null;
+  it("os dois lados pontuam quando cada um canta uma vez", () => {
+    const scorers = duo
+      .map((one) => scoringTeamFor("hit", one.team ?? "red", isOneOnOne(duo)))
+      .sort();
 
-    for (let round = 0; round < 4; round += 1) {
-      const plan = nextTurn(squad, previous);
-
-      if (plan === null) break;
-
-      const quem = scoringTeamFor("hit", plan.team, isOneOnOne(squad));
-
-      if (quem) beneficiados.add(quem);
-
-      const singer = squad.find((one) => one.id === plan.singerId);
-
-      if (singer) singer.spoke_count += 1;
-
-      previous = plan.team;
-    }
-
-    expect([...beneficiados].sort()).toEqual(["blue", "red"]);
+    expect(scorers).toEqual(["blue", "red"]);
   });
 });
 

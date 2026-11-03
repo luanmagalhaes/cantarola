@@ -1,6 +1,6 @@
 import { Scoreboard } from "@/components/room/Scoreboard";
 import { copy } from "@/data/copy";
-import type { Score, Team, Twist } from "@/types/game";
+import type { PlayerRow, Score, Team, Twist } from "@/types/game";
 
 const teamColors: Record<Team, string> = {
   red: "text-team-red",
@@ -15,6 +15,7 @@ export function TurnHeader({
   totalSeconds,
   warmingUp,
   score,
+  players,
 }: {
   singerName: string;
   team: Team;
@@ -23,13 +24,14 @@ export function TurnHeader({
   totalSeconds: number;
   warmingUp: boolean;
   score: Score;
+  players?: PlayerRow[];
 }) {
   const share = Math.max(0, Math.min(1, secondsLeft / totalSeconds));
   const urgent = !warmingUp && secondsLeft <= 10;
 
   return (
     <div className="flex w-full max-w-sm flex-col items-center gap-3">
-      <Scoreboard score={score} highlight={team} />
+      <Scoreboard score={score} players={players} highlight={team} />
 
       <div className="bg-paper stroke-hard hard-shadow w-full rounded-2xl px-4 py-3 text-center">
         <p className="font-display text-grape text-xs uppercase tracking-wider opacity-70">

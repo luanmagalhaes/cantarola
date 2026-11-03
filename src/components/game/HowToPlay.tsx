@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { copy } from "@/data/copy";
 import { deckSizes } from "@/data/songs";
-import { minPlayers, songsPerTurn } from "@/lib/game/rules";
+import { minPlayers } from "@/lib/game/rules";
 
 function Good({ children }: { children: ReactNode }) {
   return (
@@ -53,8 +53,8 @@ const slides: Slide[] = [
     body: (
       <div className="flex flex-col gap-3 text-center">
         <p className="text-base font-bold leading-snug">
-          Você recebe {songsPerTurn} músicas e cantarola cada uma{" "}
-          <Bad>só com a melodia</Bad>. Seu time tem que gritar o nome.
+          Aparece uma música por vez na sua tela. Cantarole{" "}
+          <Bad>só a melodia</Bad> e seu time tem que gritar o nome.
         </p>
         <div className="bg-lemon stroke-hard rounded-2xl p-3">
           <p className="font-display text-xl uppercase leading-tight">
@@ -96,7 +96,8 @@ const slides: Slide[] = [
           </p>
           <p className="text-xs font-bold">
             Todo mundo junto. Você canta ao vivo e tem{" "}
-            <Good>60 segundos</Good> pra emplacar o máximo de músicas.
+            <Good>60 segundos</Good> pra emplacar o máximo de músicas, uma
+            atrás da outra.
           </p>
         </div>
         <div className="bg-paper stroke-hard rounded-2xl p-3">
@@ -104,7 +105,8 @@ const slides: Slide[] = [
             {copy.modes.online.title}
           </p>
           <p className="text-xs font-bold">
-            Cada um na sua casa. Você grava um áudio por música, o time ouve e{" "}
+            Cada um na sua casa. Você grava um áudio da música que apareceu,
+            manda e vem a próxima. O time ouve e{" "}
             <strong>escreve o palpite</strong>. São <Good>90 segundos</Good>.
           </p>
         </div>
@@ -118,7 +120,7 @@ const slides: Slide[] = [
     ),
   },
   {
-    title: "Só você vê a lista",
+    title: "Só você vê a música",
     tone: "bg-team-blue text-paper",
     art: (
       <p className="text-5xl" aria-hidden="true">
@@ -128,21 +130,21 @@ const slides: Slide[] = [
     body: (
       <div className="flex flex-col gap-3 text-center">
         <p className="text-base font-bold leading-snug">
-          As músicas da rodada aparecem <Bad>só no celular de quem canta</Bad>.
-          O resto da sala não consegue espiar.
+          A música aparece <Bad>só no celular de quem canta</Bad>, uma de cada
+          vez. O resto da sala não consegue espiar.
         </p>
         <div className="bg-gold stroke-hard text-grape rounded-2xl p-3">
           <p className="font-display text-lg uppercase leading-tight">
             Não conhece a música?
           </p>
           <p className="mt-1 text-xs font-bold">
-            Toque no ♪ e ouça um pedacinho. Mas{" "}
-            <strong>coloque o fone</strong> — se o time escutar, acabou a
-            graça.
+            No presencial, abra <strong>Ver a letra</strong> e acompanhe. Na
+            online, toque no ♪ e ouça um pedacinho de <strong>fone</strong>.
+            Ou aperte <strong>Passar</strong> e vem outra na hora.
           </p>
         </div>
         <p className="text-sm font-bold leading-snug opacity-80">
-          Quando a rodada acaba, todo mundo vê o que era cada uma.
+          Quando a vez acaba, todo mundo vê o que era cada uma.
         </p>
       </div>
     ),
@@ -162,14 +164,15 @@ const slides: Slide[] = [
         <div className="bg-paper stroke-hard rounded-2xl p-3">
           <p className="font-display text-mint text-lg uppercase">Acertou</p>
           <p className="text-xs font-bold">
-            Quem canta aperta quando o time acerta — gritando o nome ou{" "}
+            Quem canta aperta quando o time acerta, gritando o nome ou{" "}
             <Good>cantando junto</Good>. Vale <Good>um ponto</Good>.
           </p>
         </div>
         <div className="bg-paper stroke-hard rounded-2xl p-3">
           <p className="font-display text-lg uppercase">Passar</p>
           <p className="text-xs font-bold">
-            Música difícil sai da rodada e <strong>ninguém pontua</strong>.
+            Não sabe essa? Passa e aparece outra na hora.{" "}
+            <strong>Ninguém pontua</strong> com a que saiu.
           </p>
         </div>
         <div className="bg-paper stroke-hard rounded-2xl p-3">
@@ -177,8 +180,9 @@ const slides: Slide[] = [
             {copy.steal.name}
           </p>
           <p className="text-xs font-bold">
-            Acabou o tempo com música sobrando? O{" "}
-            <Bad>time adversário</Bad> tenta uma. Acertou, o ponto é dele.
+            Acabou o tempo no meio de uma música? O{" "}
+            <Bad>time adversário</Bad> tenta acertar ela. Acertou, o ponto é
+            dele.
           </p>
         </div>
       </div>
@@ -198,8 +202,8 @@ const slides: Slide[] = [
     body: (
       <div className="flex flex-col gap-2.5">
         <p className="text-center text-sm font-bold leading-snug">
-          Quem cria a sala liga os que quiser. A cada rodada pode cair um deles
-          — ou nenhum.
+          Quem cria a sala liga os que quiser. A cada vez pode cair um deles,
+          ou nenhum.
         </p>
         {(["whistle", "hum", "bomb", "duel"] as const).map((twist) => (
           <div key={twist} className="bg-paper stroke-hard rounded-2xl p-3">
@@ -238,38 +242,32 @@ const slides: Slide[] = [
     ),
   },
   {
-    title: "Como termina",
+    title: "Quem manda é o dono da sala",
     tone: "bg-team-red text-paper",
     art: (
-      <div className="flex items-center justify-center gap-2">
-        {["6", "0", "s"].map((piece) => (
-          <span
-            key={piece}
-            className="font-display bg-paper text-grape stroke-hard flex h-14 w-11 items-center justify-center rounded-xl text-2xl"
-          >
-            {piece}
-          </span>
-        ))}
-      </div>
+      <p className="text-5xl" aria-hidden="true">
+        🏁
+      </p>
     ),
     body: (
       <div className="flex flex-col gap-3 text-center">
         <p className="text-base font-bold leading-snug">
-          A vez passa de um time para o outro até que{" "}
-          <Good>todo mundo tenha cantado</Good>.
+          Os times e quem começa cantando saem no sorteio. Depois de cada vez,{" "}
+          <Good>quem criou a sala escolhe quem canta</Good>. Dá pra chamar a
+          mesma pessoa quantas vezes quiser.
         </p>
         <div className="bg-lemon stroke-hard text-grape rounded-2xl p-3">
           <p className="font-display text-lg uppercase leading-tight">
-            Ganha quem fizer mais pontos
+            O fim é no botão
           </p>
           <p className="mt-1 text-xs font-bold">
-            Se der número ímpar, alguém do outro time canta de novo pra empatar
-            as rodadas.
+            Quando a última pessoa cantar, o dono aperta{" "}
+            <strong>Encerrar a partida</strong>. Ganha quem fizer mais pontos.
           </p>
         </div>
         <p className="text-sm font-bold leading-snug opacity-90">
           Dá pra jogar a partir de {minPlayers} pessoas. No um contra um, quem
-          não está cantando é quem adivinha — e leva o ponto.
+          não está cantando é quem adivinha e leva o ponto.
         </p>
       </div>
     ),

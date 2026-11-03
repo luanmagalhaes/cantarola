@@ -8,7 +8,7 @@ export type Team = "red" | "blue";
 
 export type Twist = "whistle" | "hum" | "bomb" | "duel";
 
-export type Outcome = "hit" | "stolen" | "missed";
+export type Outcome = "hit" | "stolen" | "missed" | "skipped";
 
 export type RoomStatus = "lobby" | "playing" | "done";
 

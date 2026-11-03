@@ -28,6 +28,7 @@ export interface RoomState {
   turn: TurnRow | null;
   me: PlayerRow;
   isSinger: boolean;
+  currentSongId: string | null;
   songs: TurnSongView[];
   score: Score;
   results: ResultRow[];
@@ -124,6 +125,18 @@ export const api = {
 
   restart(code: string, token: string) {
     return lobby(code, token, "restart");
+  },
+
+  chooseSinger(code: string, token: string, singerId: string) {
+    return turn(code, token, "pick", { singerId });
+  },
+
+  changeSinger(code: string, token: string) {
+    return turn(code, token, "unpick");
+  },
+
+  endMatch(code: string, token: string) {
+    return turn(code, token, "end");
   },
 
   startTurn(code: string, token: string) {
@@ -295,6 +308,12 @@ export const api = {
   preview(artist: string, title: string) {
     return request<{ previewUrl: string | null }>(
       `/api/preview?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`,
+    );
+  },
+
+  lyrics(artist: string, title: string) {
+    return request<{ lyrics: string | null }>(
+      `/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`,
     );
   },
 

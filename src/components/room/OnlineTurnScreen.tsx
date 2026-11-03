@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { NowSinging } from "@/components/game/NowSinging";
 import { PreviewGate } from "@/components/game/PreviewGate";
-import { SongCard } from "@/components/game/SongCard";
 import { TurnHeader } from "@/components/game/TurnHeader";
 import { TakeList, type GuessFeedback } from "@/components/room/TakeList";
 import { Button } from "@/components/ui/Button";
@@ -10,17 +10,14 @@ import { api, type RoomState, type TakeView } from "@/lib/api/client";
 import { copy } from "@/data/copy";
 import { leftMsFor, useNow } from "@/hooks/useNow";
 import { useRecorder } from "@/hooks/useRecorder";
+import { nameOf } from "@/lib/game/players";
 import { rivalOf } from "@/lib/game/rules";
-import { playAnthem, playSound, stopAnthem } from "@/lib/sound";
+import { playSound } from "@/lib/sound";
 import { TurnControls } from "@/components/room/TurnControls";
 import { VoiceNote } from "@/components/ui/VoiceNote";
 import type { Song } from "@/types/game";
 
 const takesIntervalMs = 2500;
-
-function nameOf(state: RoomState, id: string | null | undefined) {
-  return state.players.find((player) => player.id === id)?.name ?? "alguém";
-}
 
 export function OnlineTurnScreen({
   state,
@@ -29,7 +26,7 @@ export function OnlineTurnScreen({
 }: {
   state: RoomState;
   token: string;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void> | void;
 }) {
   const [takes, setTakes] = useState<TakeView[]>([]);
   const [target, setTarget] = useState<string | null>(null);
@@ -37,7 +34,6 @@ export function OnlineTurnScreen({
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [feedback, setFeedback] = useState<GuessFeedback | null>(null);
-  const [previewBroken, setPreviewBroken] = useState(false);
   const [busy, setBusy] = useState(false);
   const lastResultId = useRef<string | null>(null);
   const closing = useRef(false);
@@ -135,7 +131,7 @@ export function OnlineTurnScreen({
       return;
     }
 
-    void playAnthem();
+    playSound("timeup");
   }, [recordingOver, isSinger]);
 
   useEffect(() => {
@@ -176,12 +172,11 @@ export function OnlineTurnScreen({
     }
   }
 
-  async function sendTake() {
-    if (!recorder.take || !target) {
+  async function sendTake(songId: string) {
+    if (!recorder.take) {
       return;
     }
 
-    const songId = target;
     const { blob, seconds } = recorder.take;
 
     await dispatch(async () => {
@@ -191,8 +186,18 @@ export function OnlineTurnScreen({
       });
       recorder.reset();
       setTarget(null);
-      await loadTakes();
+      await Promise.all([loadTakes(), onRefresh()]);
       playSound("card");
+    });
+  }
+
+  function skip(songId: string) {
+    playSound("miss");
+    recorder.reset();
+    setTarget(null);
+    void dispatch(async () => {
+      await api.markSong(room.code, token, songId, "skipped");
+      await onRefresh();
     });
   }
 
@@ -235,20 +240,20 @@ export function OnlineTurnScreen({
     return null;
   }
 
-  const sentSongIds = new Set(
-    takes.map((take) => take.songId).filter((id): id is string => id !== null),
-  );
+  const current = songs.find((row) => row.songId === state.currentSongId);
+  const solvedCount = takes.filter((take) => take.solved).length;
 
   return (
     <main className="confetti-dots bg-cream flex min-h-dvh flex-col items-center gap-4 px-5 pb-[calc(2rem+var(--safe-bottom))] pt-[calc(3.5rem+var(--safe-top))]">
       <TurnHeader
-        singerName={nameOf(state, turn.singer_id)}
+        singerName={nameOf(state.players, turn.singer_id)}
         team={turn.team}
         twist={turn.twist}
         secondsLeft={secondsLeft}
         totalSeconds={answering ? answerLeft || 1 : room.turn_seconds}
         warmingUp={Boolean(warmingUp)}
         score={score}
+        players={state.players}
       />
 
       {paused ? (
@@ -284,11 +289,11 @@ export function OnlineTurnScreen({
             <p className="font-display text-grape text-2xl uppercase leading-tight">
               {isSinger
                 ? "Sua vez de gravar"
-                : `${nameOf(state, turn.singer_id)} vai gravar`}
+                : `${nameOf(state.players, turn.singer_id)} vai gravar`}
             </p>
             <p className="mt-2 text-sm font-bold leading-snug opacity-80">
               {isSinger
-                ? "Escolha uma música da lista, grave o cantarolo e mande. Quantas der no tempo."
+                ? "Aparece uma música por vez. Grave o cantarolo e mande. Não conhece? Passa e vem outra."
                 : "Os áudios vão aparecer aqui. Ouça e escreva o nome da música."}
             </p>
           </div>
@@ -299,9 +304,8 @@ export function OnlineTurnScreen({
               disabled={busy}
               onClick={() =>
                 void dispatch(async () => {
-                  stopAnthem();
                   await api.startTurn(room.code, token);
-                  onRefresh();
+                  await onRefresh();
                 })
               }
             >
@@ -312,154 +316,140 @@ export function OnlineTurnScreen({
               Esperando começar
             </p>
           )}
+
+          {state.me.is_host ? (
+            <Button
+              size="sm"
+              color="paper"
+              disabled={busy}
+              onClick={() =>
+                void dispatch(async () => {
+                  await api.changeSinger(room.code, token);
+                  await onRefresh();
+                })
+              }
+            >
+              Trocar quem canta
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
       {isSinger && running && !recordingOver ? (
         <>
-          <div className="bg-grape w-full max-w-sm rounded-2xl px-4 py-3 text-center">
-            <p className="font-display text-lemon text-lg uppercase leading-tight">
-              Aperte o vermelho e cantarole
+          {recorder.status === "blocked" ? (
+            <p className="font-display bg-coral text-paper stroke-thin w-full max-w-sm rounded-xl px-3 py-2 text-center text-xs uppercase leading-snug">
+              {copy.errors.noMicrophone}
             </p>
-            <p className="text-paper mt-1 text-xs font-bold leading-snug">
-              {recorder.status === "blocked"
-                ? copy.errors.noMicrophone
-                : "O ♪ toca um trecho pra você lembrar. Mande quantas der."}
-            </p>
-          </div>
+          ) : null}
 
-          <ul className="flex w-full max-w-sm flex-col gap-2">
-            {songs.map((row, index) => {
-              const alreadySent = sentSongIds.has(row.songId);
-              const mine = target === row.songId;
-              const preparing = mine && recorder.status === "idle";
-              const recording = mine && recorder.status === "recording";
-              const ready = mine && recorder.status === "ready" && recorder.take;
-              const otherBusy = !mine && recorder.status === "recording";
+          {current?.song ? (
+            <NowSinging
+              key={current.songId}
+              song={current.song}
+              number={songs.length}
+              onPreview={() => setPreview(current.song)}
+            >
+              {recorder.status === "recording" ? (
+                <div className="flex w-full items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => recorder.stop()}
+                    className="bg-coral stroke-hard font-display text-paper flex-1 rounded-2xl px-2 py-3 text-lg uppercase"
+                    style={{ animation: "pulse-record 1s infinite" }}
+                  >
+                    Parar
+                  </button>
+                  <span className="font-display text-grape text-2xl leading-none">
+                    {recorder.seconds}s
+                  </span>
+                </div>
+              ) : recorder.status === "ready" && recorder.take ? (
+                <>
+                  <VoiceNote
+                    src={recorder.take.url}
+                    seconds={recorder.take.seconds}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      color="mint"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => void sendTake(current.songId)}
+                    >
+                      {busy ? "Mandando" : "Mandar"}
+                    </Button>
+                    <Button
+                      color="paper"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => {
+                        recorder.reset();
+                        setTarget(null);
+                      }}
+                    >
+                      Regravar
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {recorder.problem ? (
+                    <p className="font-display bg-coral text-paper stroke-thin rounded-lg px-2 py-1.5 text-center text-xs uppercase leading-snug">
+                      {recorder.problem}
+                    </p>
+                  ) : null}
+                  <Button
+                    color="coral"
+                    disabled={
+                      busy || (target === current.songId && !recorder.problem)
+                    }
+                    onClick={() => {
+                      recorder.reset();
+                      setTarget(current.songId);
+                      void recorder.start();
+                    }}
+                  >
+                    {target === current.songId && !recorder.problem
+                      ? "Abrindo o microfone"
+                      : "● Gravar"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="paper"
+                    disabled={busy}
+                    onClick={() => skip(current.songId)}
+                  >
+                    Passar
+                  </Button>
+                </>
+              )}
+            </NowSinging>
+          ) : (
+            <div className="bg-paper stroke-hard hard-shadow w-full max-w-sm rounded-2xl px-4 py-5 text-center">
+              <p className="font-display text-grape text-2xl uppercase leading-tight">
+                Puxando a próxima
+              </p>
+            </div>
+          )}
 
-              return (
-                <SongCard
-                  key={row.songId}
-                  song={row.song}
-                  outcome={row.outcome}
-                  index={index}
-                  isBomb={turn.bomb_song_id === row.songId}
-                  actions={
-                    row.outcome === null ? (
-                      recording ? (
-                        <div className="flex w-full items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              recorder.stop();
-                            }}
-                            className="bg-coral stroke-hard font-display text-paper flex-1 rounded-lg px-2 py-2 text-sm uppercase"
-                            style={{ animation: "pulse-record 1s infinite" }}
-                          >
-                            Parar
-                          </button>
-                          <span className="font-display text-grape text-xl leading-none">
-                            {recorder.seconds}s
-                          </span>
-                        </div>
-                      ) : ready && recorder.take ? (
-                        <div className="flex w-full flex-col gap-2">
-                          {previewBroken ? (
-                            <p className="font-display bg-lemon text-grape stroke-thin rounded-lg px-2 py-1.5 text-center text-xs uppercase leading-snug">
-                              Seu aparelho não toca a prévia, mas a gravação de{" "}
-                              {recorder.take.seconds}s está aqui. Pode mandar.
-                            </p>
-                          ) : (
-                            <VoiceNote
-                              src={recorder.take.url}
-                              seconds={recorder.take.seconds}
-                            />
-                          )}
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                playSound("tap");
-                                void sendTake();
-                              }}
-                              className="font-display bg-mint text-paper stroke-thin flex-1 rounded-lg px-2 py-2 text-sm uppercase disabled:opacity-50"
-                            >
-                              {busy ? "Mandando" : "Mandar"}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                playSound("tap");
-                                recorder.reset();
-                                setTarget(null);
-                              }}
-                              className="font-display bg-paper text-grape stroke-thin rounded-lg px-3 py-2 text-sm uppercase disabled:opacity-50"
-                            >
-                              Regravar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex w-full flex-col gap-2">
-                          {mine && recorder.problem ? (
-                            <p className="font-display bg-coral text-paper stroke-thin rounded-lg px-2 py-1.5 text-center text-xs uppercase leading-snug">
-                              {recorder.problem}
-                            </p>
-                          ) : null}
-                          <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={alreadySent || otherBusy || preparing}
-                            onClick={() => {
-                              recorder.reset();
-                              setPreviewBroken(false);
-                              setTarget(row.songId);
-                              void recorder.start();
-                            }}
-                            aria-label={`Gravar ${row.song?.title ?? "essa música"}`}
-                            className="bg-coral stroke-thin font-display text-paper flex flex-1 items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-40"
-                          >
-                            <span className="text-base leading-none">●</span>
-                            {alreadySent
-                              ? "Já mandei"
-                              : preparing
-                                ? "Abrindo o microfone"
-                                : "Gravar"}
-                          </button>
-                          {row.song ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                playSound("tap");
-                                setPreview(row.song);
-                              }}
-                              aria-label={`${copy.preview.button}: ${row.song.title}`}
-                              className="font-display bg-gold text-grape stroke-thin rounded-lg px-2.5 py-1.5 text-sm uppercase"
-                            >
-                              ♪
-                            </button>
-                          ) : null}
-                          </div>
-                        </div>
-                      )
-                    ) : null
-                  }
-                />
-              );
-            })}
-          </ul>
+          <p className="font-display text-grape text-center text-sm uppercase opacity-80">
+            {takes.length}{" "}
+            {takes.length === 1 ? "áudio mandado" : "áudios mandados"} ·{" "}
+            {solvedCount} {solvedCount === 1 ? "acertado" : "acertados"}
+          </p>
 
           <Button
             size="sm"
             className="max-w-sm"
             color="grape"
-            disabled={busy || sentSongIds.size === 0}
+            disabled={
+              busy || takes.length === 0 || recorder.status === "recording"
+            }
             onClick={() =>
               void dispatch(async () => {
                 await api.closeTurn(room.code, token);
-                onRefresh();
+                await onRefresh();
               })
             }
           >
@@ -512,6 +502,23 @@ export function OnlineTurnScreen({
         </>
       ) : null}
 
+      {!isSinger && stealing && state.me.is_host ? (
+        <Button
+          size="sm"
+          className="max-w-sm"
+          color="grape"
+          disabled={busy}
+          onClick={() =>
+            void dispatch(async () => {
+              await api.endSteal(room.code, token);
+              await onRefresh();
+            })
+          }
+        >
+          Encerrar o roubo
+        </Button>
+      ) : null}
+
       {isSinger && (stealing || answering) ? (
         <>
           <TakeList takes={takes} canGuess={false} busy={busy} onGuess={guess} />
@@ -525,36 +532,13 @@ export function OnlineTurnScreen({
                 await (stealing
                   ? api.endSteal(room.code, token)
                   : api.closeTurn(room.code, token));
-                onRefresh();
+                await onRefresh();
               })
             }
           >
             {stealing ? "Encerrar o roubo" : "Fechar a rodada"}
           </Button>
         </>
-      ) : null}
-
-      {isSinger && takes.length > 0 && running ? (
-        <div className="bg-paper stroke-hard hard-shadow w-full max-w-sm rounded-2xl px-4 py-3 text-center">
-          <p className="font-display text-grape text-lg uppercase leading-tight">
-            {takes.filter((take) => take.solved).length} de {takes.length}{" "}
-            áudios acertados
-          </p>
-        </div>
-      ) : null}
-
-      {turn.status === "done" ? (
-        <ul className="flex w-full max-w-sm flex-col gap-2">
-          {songs.map((row, index) => (
-            <SongCard
-              key={row.songId}
-              song={row.song}
-              outcome={row.outcome}
-              index={index}
-              isBomb={turn.bomb_song_id === row.songId}
-            />
-          ))}
-        </ul>
       ) : null}
 
       {flash ? (

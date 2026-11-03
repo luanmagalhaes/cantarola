@@ -76,7 +76,13 @@ export const copy = {
   steal: {
     name: "Roubo",
     description:
-      "Acabou o tempo com música sobrando? O time adversário tenta uma.",
+      "Acabou o tempo no meio de uma música? O time adversário tenta acertar.",
+  },
+  lyrics: {
+    show: "Ver a letra",
+    hide: "Esconder a letra",
+    loading: "Procurando a letra...",
+    missing: "Não achei a letra dessa. Vai de memória que dá certo.",
   },
   preview: {
     button: "Não conheço essa",

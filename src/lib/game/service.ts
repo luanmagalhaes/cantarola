@@ -5,16 +5,17 @@ import { serverClient } from "@/lib/supabase/server";
 import { songById, songsFor } from "@/data/songs";
 import {
   assignTeams,
+  canSing,
   canStart,
-  isGameOver,
-  nextTurn,
+  currentSongOf,
+  pickBombPosition,
   pickTwist,
+  pileOrder,
   pointsFor,
   scoreFrom,
   scoringTeamFor,
   shuffle,
   isOneOnOne,
-  songsPerTurn,
   winnerOf,
 } from "@/lib/game/rules";
 import type {
@@ -39,6 +40,10 @@ const answerSeconds = 60;
 
 function fail(status: number): never {
   throw new ServiceError(status, messageFor(status));
+}
+
+function wasClaimed(rows: unknown): boolean {
+  return ((rows as unknown[] | null) ?? []).length > 0;
 }
 
 async function freeCode(): Promise<string> {
@@ -328,8 +333,31 @@ export async function shuffleTeams(room: RoomRow, me: PlayerRow) {
   );
 }
 
+const songRestHours = 24;
+
+async function restingSongIds(): Promise<Set<string>> {
+  const since = new Date(
+    Date.now() - songRestHours * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data } = await serverClient()
+    .from("ll_song_plays")
+    .select("song_id")
+    .gte("played_at", since);
+
+  return new Set(
+    ((data as { song_id: string }[] | null) ?? []).map((row) => row.song_id),
+  );
+}
+
+async function markSongPlayed(songId: string) {
+  await serverClient()
+    .from("ll_song_plays")
+    .upsert({ song_id: songId, played_at: new Date().toISOString() });
+}
+
 async function buildPile(room: RoomRow) {
-  const pool = shuffle(songsFor(room.deck_mode));
+  const pool = pileOrder(songsFor(room.deck_mode), await restingSongIds());
 
   await serverClient().from("ll_draw_pile").delete().eq("room_id", room.id);
 
@@ -380,30 +408,79 @@ async function drawSongs(room: RoomRow, howMany: number): Promise<string[]> {
   return ids;
 }
 
-async function createTurn(
-  room: RoomRow,
-  players: PlayerRow[],
-  previousTeam: Team | null,
-): Promise<TurnRow | null> {
-  const plan = nextTurn(players, previousTeam);
-
-  if (!plan) {
-    return null;
+async function returnSongsToPile(room: RoomRow, songIds: string[]) {
+  if (songIds.length === 0) {
+    return;
   }
 
+  const { data } = await serverClient()
+    .from("ll_draw_pile")
+    .select("position")
+    .eq("room_id", room.id)
+    .order("position", { ascending: true })
+    .limit(1);
+
+  const front =
+    ((data as { position: number }[] | null) ?? [])[0]?.position ?? 0;
+
+  await serverClient()
+    .from("ll_draw_pile")
+    .upsert(
+      songIds.map((songId, index) => ({
+        room_id: room.id,
+        song_id: songId,
+        position: front - songIds.length + index,
+      })),
+      { onConflict: "room_id,song_id", ignoreDuplicates: true },
+    );
+}
+
+async function clearSongRest(songIds: string[]) {
+  if (songIds.length === 0) {
+    return;
+  }
+
+  await serverClient().from("ll_song_plays").delete().in("song_id", songIds);
+}
+
+async function discardReadyTurn(
+  room: RoomRow,
+  turn: TurnRow,
+): Promise<boolean> {
+  const songs = await turnSongs(turn.id);
+
+  const { data: removed } = await serverClient()
+    .from("ll_turns")
+    .delete()
+    .eq("id", turn.id)
+    .eq("status", "ready")
+    .select("id");
+
+  if (!wasClaimed(removed)) {
+    return false;
+  }
+
+  const unsungIds = songs
+    .filter((row) => row.outcome === null)
+    .map((row) => row.song_id);
+
+  await returnSongsToPile(room, unsungIds);
+  await clearSongRest(unsungIds);
+
+  return true;
+}
+
+async function createTurn(room: RoomRow, singer: PlayerRow): Promise<TurnRow> {
   const twist = pickTwist(room.twists ?? []);
-  const songIds = await drawSongs(room, songsPerTurn);
-  const bombPosition =
-    twist === "bomb" ? shuffle(songIds.map((_, index) => index))[0] : null;
 
   const { data } = await serverClient()
     .from("ll_turns")
     .insert({
       room_id: room.id,
-      singer_id: plan.singerId,
-      team: plan.team,
+      singer_id: singer.id,
+      team: singer.team,
       twist,
-      bomb_position: bombPosition,
+      bomb_position: twist === "bomb" ? pickBombPosition() : null,
     })
     .select("*")
     .single();
@@ -414,17 +491,81 @@ async function createTurn(
     fail(500);
   }
 
-  await serverClient()
-    .from("ll_turn_songs")
-    .insert(
-      songIds.map((songId, index) => ({
-        turn_id: turn.id,
-        song_id: songId,
-        position: index,
-      })),
-    );
+  await dealNextSong(room, turn);
 
   return turn;
+}
+
+export async function dealNextSong(room: RoomRow, turn: TurnRow) {
+  const rows = await turnSongs(turn.id);
+  const used = new Set(rows.map((row) => row.song_id));
+  const position = rows.reduce(
+    (top, row) => Math.max(top, row.position + 1),
+    0,
+  );
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const [songId] = await drawSongs(room, 1);
+
+    if (!songId || used.has(songId)) {
+      continue;
+    }
+
+    const { error } = await serverClient()
+      .from("ll_turn_songs")
+      .insert({ turn_id: turn.id, song_id: songId, position });
+
+    if (error) {
+      await returnSongsToPile(room, [songId]);
+
+      if (error.code === "23505") {
+        return;
+      }
+
+      continue;
+    }
+
+    await markSongPlayed(songId);
+
+    return;
+  }
+
+  throw new ServiceError(
+    500,
+    "Não consegui puxar a próxima música. Tente de novo.",
+  );
+}
+
+export function onClock(turn: TurnRow): boolean {
+  if (turn.paused_at) {
+    return true;
+  }
+
+  return turn.ends_at !== null && Date.parse(turn.ends_at) > Date.now();
+}
+
+async function recordedSongIds(turnId: string): Promise<Set<string>> {
+  const { data } = await serverClient()
+    .from("ll_takes")
+    .select("song_id")
+    .eq("turn_id", turnId);
+
+  return new Set(
+    ((data as { song_id: string }[] | null) ?? []).map((row) => row.song_id),
+  );
+}
+
+export async function currentSongFor(
+  room: RoomRow,
+  turn: TurnRow,
+  songs: TurnSongRow[],
+): Promise<TurnSongRow | null> {
+  const recorded =
+    room.play_mode === "online"
+      ? await recordedSongIds(turn.id)
+      : new Set<string>();
+
+  return currentSongOf(songs, recorded);
 }
 
 export async function startGame(room: RoomRow, me: PlayerRow) {
@@ -447,21 +588,169 @@ export async function startGame(room: RoomRow, me: PlayerRow) {
 
   await buildPile(room);
 
-  const turn = await createTurn(room, players, null);
+  const firstSinger = shuffle(players.filter((player) => canSing(player)))[0];
 
-  if (!turn) {
+  if (!firstSinger) {
     fail(500);
+  }
+
+  const firstTurn = await createTurn(room, firstSinger);
+
+  const { data: claimed } = await serverClient()
+    .from("ll_rooms")
+    .update({
+      status: "playing",
+      current_turn_id: firstTurn.id,
+      round_number: 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", room.id)
+    .eq("status", "lobby")
+    .select("id");
+
+  if (!wasClaimed(claimed)) {
+    await discardReadyTurn(room, firstTurn);
+
+    fail(409);
+  }
+}
+
+export async function chooseSinger(
+  room: RoomRow,
+  me: PlayerRow,
+  singerId: string,
+) {
+  if (!me.is_host) {
+    throw new ServiceError(403, "Só quem criou a sala escolhe quem canta.");
+  }
+
+  if (room.status !== "playing") {
+    fail(409);
+  }
+
+  const turn = await currentTurn(room);
+
+  if (turn && turn.status !== "done" && turn.status !== "ready") {
+    throw new ServiceError(
+      409,
+      "Ainda tem gente cantando. Espere a vez acabar.",
+    );
+  }
+
+  const players = await roomPlayers(room.id);
+  const singer = players.find((player) => player.id === singerId);
+
+  if (!singer || !canSing(singer)) {
+    throw new ServiceError(400, "Essa pessoa não está em nenhum time.");
+  }
+
+  const replacing = turn?.status === "ready";
+
+  if (replacing && turn && !(await discardReadyTurn(room, turn))) {
+    throw new ServiceError(
+      409,
+      "Ainda tem gente cantando. Espere a vez acabar.",
+    );
+  }
+
+  const next = await createTurn(room, singer);
+  const claim = serverClient()
+    .from("ll_rooms")
+    .update({
+      current_turn_id: next.id,
+      round_number: replacing ? room.round_number : room.round_number + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", room.id);
+
+  const { data: claimed } = await (room.current_turn_id
+    ? claim.eq("current_turn_id", room.current_turn_id)
+    : claim.is("current_turn_id", null)
+  ).select("id");
+
+  if (!wasClaimed(claimed)) {
+    await discardReadyTurn(room, next);
+
+    fail(409);
+  }
+}
+
+async function lastFinishedTurnId(room: RoomRow): Promise<string | null> {
+  const { data } = await serverClient()
+    .from("ll_turns")
+    .select("id")
+    .eq("room_id", room.id)
+    .eq("status", "done")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  return ((data as { id: string }[] | null) ?? [])[0]?.id ?? null;
+}
+
+export async function reopenPick(room: RoomRow, me: PlayerRow) {
+  if (!me.is_host) {
+    throw new ServiceError(403, "Só quem criou a sala troca quem canta.");
+  }
+
+  const turn = await currentTurn(room);
+
+  if (!turn || turn.status !== "ready") {
+    throw new ServiceError(409, "A vez já começou. Espere acabar pra trocar.");
+  }
+
+  if (!(await discardReadyTurn(room, turn))) {
+    throw new ServiceError(409, "A vez já começou. Espere acabar pra trocar.");
   }
 
   await serverClient()
     .from("ll_rooms")
     .update({
-      status: "playing",
-      current_turn_id: turn.id,
-      round_number: 1,
+      current_turn_id: await lastFinishedTurnId(room),
+      round_number: Math.max(0, room.round_number - 1),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", room.id);
+    .eq("id", room.id)
+    .eq("current_turn_id", turn.id);
+}
+
+export async function endMatch(room: RoomRow, me: PlayerRow) {
+  if (!me.is_host) {
+    throw new ServiceError(403, "Só quem criou a sala encerra a partida.");
+  }
+
+  if (room.status !== "playing") {
+    fail(409);
+  }
+
+  const turn = await currentTurn(room);
+
+  if (turn && (turn.status === "running" || turn.status === "stealing")) {
+    throw new ServiceError(
+      409,
+      "Tem gente cantando agora. Encerre quando a vez acabar.",
+    );
+  }
+
+  const { data: claimed } = await serverClient()
+    .from("ll_rooms")
+    .update({
+      status: "done",
+      current_turn_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", room.id)
+    .eq("status", "playing")
+    .select("id");
+
+  if (!wasClaimed(claimed)) {
+    return;
+  }
+
+  if (turn?.status === "ready") {
+    await discardReadyTurn(room, turn);
+  }
+
+  await saveMatch(room, await roomPlayers(room.id));
 }
 
 export async function startTurn(room: RoomRow, me: PlayerRow) {
@@ -497,6 +786,20 @@ export async function startTurn(room: RoomRow, me: PlayerRow) {
     .eq("id", turn.id);
 }
 
+function outcomesAllowed(room: RoomRow, turn: TurnRow): Outcome[] {
+  if (turn.status === "stealing") {
+    return room.play_mode === "online" ? [] : ["stolen", "missed"];
+  }
+
+  if (room.play_mode === "online") {
+    return ["skipped"];
+  }
+
+  return turn.twist === "duel"
+    ? ["hit", "stolen", "skipped"]
+    : ["hit", "skipped"];
+}
+
 export async function markSong(
   room: RoomRow,
   me: PlayerRow,
@@ -509,41 +812,50 @@ export async function markSong(
     fail(409);
   }
 
-  const isStealPhase = turn.status === "stealing";
-
   if (turn.singer_id !== me.id) {
     fail(403);
   }
 
-  if (!isStealPhase && turn.status !== "running") {
+  const stealing = turn.status === "stealing";
+
+  if (!stealing && turn.status !== "running") {
     fail(409);
   }
 
-  if (isStealPhase && outcome !== "stolen" && outcome !== "missed") {
-    fail(409);
-  }
+  if (!outcomesAllowed(room, turn).includes(outcome)) {
+    if (room.play_mode === "online") {
+      throw new ServiceError(
+        403,
+        "Na versão online o ponto vem do palpite de quem ouviu.",
+      );
+    }
 
-  if (room.play_mode === "online" && outcome !== "missed") {
-    throw new ServiceError(
-      403,
-      "Na versão online o ponto vem do palpite de quem ouviu.",
-    );
+    fail(409);
   }
 
   const songs = await turnSongs(turn.id);
   const target = songs.find((row) => row.song_id === songId);
 
-  if (!target || target.outcome !== null) {
+  if (!target) {
     fail(409);
   }
 
+  if (target.outcome !== null) {
+    throw new ServiceError(409, "Essa música já saiu da sua vez.");
+  }
+
+  const current = stealing ? null : await currentSongFor(room, turn, songs);
+
+  if (!stealing && current?.song_id !== songId) {
+    throw new ServiceError(409, "Essa música já saiu da sua vez.");
+  }
+
   const players = await roomPlayers(room.id);
-  const duel = isOneOnOne(players);
   const points = pointsFor(
     outcome,
     turn.bomb_position !== null && turn.bomb_position === target.position,
   );
-  const scoringTeam = scoringTeamFor(outcome, turn.team, duel);
+  const scoringTeam = scoringTeamFor(outcome, turn.team, isOneOnOne(players));
   const client = serverClient();
 
   const { data: claimed } = await client
@@ -554,27 +866,45 @@ export async function markSong(
     .is("outcome", null)
     .select("song_id");
 
-  if (((claimed as { song_id: string }[] | null) ?? []).length === 0) {
+  if (!wasClaimed(claimed)) {
     fail(409);
   }
 
-  const { error } = await client.from("ll_results").insert({
-    room_id: room.id,
-    turn_id: turn.id,
-    song_id: songId,
-    outcome,
-    scoring_team: scoringTeam,
-    points,
-  });
+  if (points > 0) {
+    const { error } = await client.from("ll_results").insert({
+      room_id: room.id,
+      turn_id: turn.id,
+      song_id: songId,
+      outcome,
+      scoring_team: scoringTeam,
+      points,
+    });
 
-  if (error) {
-    await client
-      .from("ll_turn_songs")
-      .update({ outcome: null })
-      .eq("turn_id", turn.id)
-      .eq("song_id", songId);
+    if (error) {
+      await client
+        .from("ll_turn_songs")
+        .update({ outcome: null })
+        .eq("turn_id", turn.id)
+        .eq("song_id", songId);
 
-    throw new ServiceError(500, "Não consegui gravar o ponto. Tenta de novo.");
+      throw new ServiceError(500, "Não consegui gravar o ponto. Tenta de novo.");
+    }
+  }
+
+  if (stealing) {
+    const stillOpen = songs.some(
+      (row) => row.song_id !== songId && row.outcome === null,
+    );
+
+    if (!stillOpen && (await claimTurnStatus(turn, "stealing", "done"))) {
+      await finishTurn(room, turn);
+    }
+
+    return;
+  }
+
+  if (onClock(turn)) {
+    await dealNextSong(room, turn);
   }
 }
 
@@ -583,6 +913,10 @@ export async function closeTurn(room: RoomRow, me: PlayerRow) {
 
   if (!turn || turn.status === "done") {
     return;
+  }
+
+  if (turn.status === "ready") {
+    fail(409);
   }
 
   const deadline = turn.answer_ends_at ?? turn.ends_at;
@@ -621,7 +955,7 @@ export async function closeTurn(room: RoomRow, me: PlayerRow) {
     return;
   }
 
-  await finishTurn(room, turn, pending);
+  await finishTurn(room, turn);
 }
 
 async function claimTurnStatus(
@@ -643,21 +977,13 @@ async function dropSongsWithoutTake(
   turn: TurnRow,
   pending: TurnSongRow[],
 ): Promise<TurnSongRow[]> {
-  const { data } = await serverClient()
-    .from("ll_takes")
-    .select("song_id")
-    .eq("turn_id", turn.id);
-
-  const recorded = new Set(
-    ((data as { song_id: string }[] | null) ?? []).map((row) => row.song_id),
-  );
-
+  const recorded = await recordedSongIds(turn.id);
   const neverSung = pending.filter((row) => !recorded.has(row.song_id));
 
   if (neverSung.length > 0) {
     await serverClient()
       .from("ll_turn_songs")
-      .update({ outcome: "missed" })
+      .update({ outcome: "skipped" })
       .eq("turn_id", turn.id)
       .in(
         "song_id",
@@ -668,18 +994,12 @@ async function dropSongsWithoutTake(
   return pending.filter((row) => recorded.has(row.song_id));
 }
 
-async function finishTurn(
-  room: RoomRow,
-  turn: TurnRow,
-  pending: TurnSongRow[],
-) {
-  if (pending.length > 0) {
-    await serverClient()
-      .from("ll_turn_songs")
-      .update({ outcome: "missed" })
-      .eq("turn_id", turn.id)
-      .is("outcome", null);
-  }
+async function finishTurn(room: RoomRow, turn: TurnRow) {
+  await serverClient()
+    .from("ll_turn_songs")
+    .update({ outcome: "missed" })
+    .eq("turn_id", turn.id)
+    .is("outcome", null);
 
   const { data: singerRow } = await serverClient()
     .from("ll_players")
@@ -695,41 +1015,9 @@ async function finishTurn(
     })
     .eq("id", turn.singer_id);
 
-  const players = await roomPlayers(room.id);
-
-  if (isGameOver(players)) {
-    await saveMatch(room, players);
-
-    await serverClient()
-      .from("ll_rooms")
-      .update({
-        status: "done",
-        current_turn_id: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", room.id);
-
-    return;
-  }
-
-  const next = await createTurn(room, players, turn.team);
-
-  if (!next) {
-    await serverClient()
-      .from("ll_rooms")
-      .update({ status: "done", current_turn_id: null })
-      .eq("id", room.id);
-
-    return;
-  }
-
   await serverClient()
     .from("ll_rooms")
-    .update({
-      current_turn_id: next.id,
-      round_number: room.round_number + 1,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ updated_at: new Date().toISOString() })
     .eq("id", room.id);
 }
 
@@ -740,25 +1028,32 @@ export async function endStealPhase(room: RoomRow, me: PlayerRow) {
     fail(409);
   }
 
-  if (turn.singer_id !== me.id) {
-    fail(403);
+  if (turn.singer_id !== me.id && !me.is_host) {
+    throw new ServiceError(
+      403,
+      "Só quem canta ou quem criou a sala encerra o roubo.",
+    );
   }
-
-  const songs = await turnSongs(turn.id);
 
   if (!(await claimTurnStatus(turn, "stealing", "done"))) {
     return;
   }
 
-  await finishTurn(
-    room,
-    turn,
-    songs.filter((row) => row.outcome === null),
-  );
+  await finishTurn(room, turn);
+}
+
+async function songsSung(roomId: string): Promise<number> {
+  const { count } = await serverClient()
+    .from("ll_turn_songs")
+    .select("song_id, ll_turns!inner(room_id)", { count: "exact", head: true })
+    .eq("ll_turns.room_id", roomId)
+    .in("outcome", ["hit", "stolen", "missed"]);
+
+  return count ?? 0;
 }
 
 async function saveMatch(room: RoomRow, players: PlayerRow[]) {
-  if (room.is_test) {
+  if (room.is_test || players.every((player) => player.spoke_count === 0)) {
     return;
   }
 
@@ -773,7 +1068,7 @@ async function saveMatch(room: RoomRow, players: PlayerRow[]) {
       score_red: score.red,
       score_blue: score.blue,
       winner: winnerOf(score),
-      songs_played: results.length,
+      songs_played: await songsSung(room.id),
       players: players
         .filter((player) => player.team !== null)
         .map((player) => ({ name: player.name, team: player.team })),
@@ -841,28 +1136,37 @@ export async function undoLastResult(room: RoomRow, me: PlayerRow) {
     .from("ll_results")
     .select("*")
     .eq("room_id", room.id)
+    .gt("points", 0)
     .order("created_at", { ascending: false })
     .limit(1);
 
   const last = ((data as ResultRow[] | null) ?? [])[0];
 
   if (!last) {
-    throw new ServiceError(409, "Não tem jogada pra desfazer.");
+    throw new ServiceError(409, "Não tem ponto pra tirar.");
   }
+
+  const turn = await currentTurn(room);
+  const guessable =
+    room.play_mode === "online" &&
+    turn?.id === last.turn_id &&
+    (turn.status === "running" || turn.status === "stealing");
 
   await client.from("ll_results").delete().eq("id", last.id);
 
   await client
     .from("ll_turn_songs")
-    .update({ outcome: null })
+    .update({ outcome: guessable ? null : "missed" })
     .eq("turn_id", last.turn_id)
     .eq("song_id", last.song_id);
 
-  await client
-    .from("ll_takes")
-    .update({ solved_by: null, solved_at: null })
-    .eq("turn_id", last.turn_id)
-    .eq("song_id", last.song_id);
+  if (room.play_mode === "online") {
+    await client
+      .from("ll_takes")
+      .update({ solved_by: null, solved_at: null })
+      .eq("turn_id", last.turn_id)
+      .eq("song_id", last.song_id);
+  }
 
   return last;
 }
@@ -928,6 +1232,10 @@ export async function roomState(room: RoomRow, me: PlayerRow) {
   const isSinger = turn?.singer_id === me.id;
   const songs = turn ? await turnSongs(turn.id) : [];
   const revealed = isSinger || turn?.status === "done";
+  const current =
+    turn && isSinger && turn.status === "running"
+      ? await currentSongFor(room, turn, songs)
+      : null;
 
   return {
     room,
@@ -938,6 +1246,7 @@ export async function roomState(room: RoomRow, me: PlayerRow) {
         : turn,
     me,
     isSinger,
+    currentSongId: current?.song_id ?? null,
     songs: visibleSongs(songs, revealed),
     score: scoreFrom(results),
     results: results.slice(-12),

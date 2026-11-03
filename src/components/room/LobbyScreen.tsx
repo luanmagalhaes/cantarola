@@ -28,7 +28,7 @@ export function LobbyScreen({
   state: RoomState;
   token: string;
   onHelp: () => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void> | void;
 }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +68,11 @@ export function LobbyScreen({
 
   async function runDraw() {
     setDrawing(true);
-    await dispatch(() => api.drawTeams(room.code, token));
+    await dispatch(async () => {
+      await api.drawTeams(room.code, token);
+      await onRefresh();
+      setShowDraw(true);
+    });
     setDrawing(false);
   }
 

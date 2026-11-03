@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { stopAnthem } from "@/lib/sound";
 
 const speeds = [1, 1.5, 2];
 
@@ -20,7 +19,7 @@ function bars(seed: string, count: number): number[] {
     hash = (hash * 31 + seed.charCodeAt(at)) % 100000;
   }
 
-  return Array.from({ length: count }, (_, index) => {
+  return Array.from({ length: count }, () => {
     hash = (hash * 1103515245 + 12345) % 2147483648;
 
     return 0.25 + ((hash >> 8) % 100) / 133;
@@ -69,7 +68,6 @@ export function VoiceNote({
       return;
     }
 
-    stopAnthem();
     document.querySelectorAll("audio").forEach((other) => {
       if (other !== audio && !other.paused) {
         other.pause();
