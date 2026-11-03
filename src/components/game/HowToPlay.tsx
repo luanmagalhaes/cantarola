@@ -53,8 +53,8 @@ const slides: Slide[] = [
     body: (
       <div className="flex flex-col gap-3 text-center">
         <p className="text-base font-bold leading-snug">
-          Aparece uma música por vez na sua tela. Cantarole{" "}
-          <Bad>só a melodia</Bad> e seu time tem que gritar o nome.
+          As músicas aparecem só na sua tela. Cantarole <Bad>só a melodia</Bad>{" "}
+          e seu time tem que gritar o nome.
         </p>
         <div className="bg-lemon stroke-hard rounded-2xl p-3">
           <p className="font-display text-xl uppercase leading-tight">
@@ -130,8 +130,9 @@ const slides: Slide[] = [
     body: (
       <div className="flex flex-col gap-3 text-center">
         <p className="text-base font-bold leading-snug">
-          A música aparece <Bad>só no celular de quem canta</Bad>, uma de cada
-          vez. O resto da sala não consegue espiar.
+          As músicas aparecem <Bad>só no celular de quem canta</Bad>: 5 de uma
+          vez no presencial, uma por vez na online. O resto da sala não
+          consegue espiar.
         </p>
         <div className="bg-gold stroke-hard text-grape rounded-2xl p-3">
           <p className="font-display text-lg uppercase leading-tight">

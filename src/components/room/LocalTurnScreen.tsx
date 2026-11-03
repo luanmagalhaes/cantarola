@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { HandCard } from "@/components/game/HandCard";
 import { NowSinging } from "@/components/game/NowSinging";
+import { TeamSongsModal } from "@/components/room/TeamSongsModal";
 import { TurnControls } from "@/components/room/TurnControls";
 import { TurnHeader } from "@/components/game/TurnHeader";
 import { Button } from "@/components/ui/Button";
@@ -37,10 +39,21 @@ export function LocalTurnScreen({
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [localOutcomes, setLocalOutcomes] = useState<Record<string, Outcome>>(
+    {},
+  );
+  const [songsOf, setSongsOf] = useState<Team | null>(null);
   const lastResultId = useRef<string | null>(null);
   const closing = useRef(false);
 
   const { room, turn, isSinger, songs, score } = state;
+  const turnId = turn?.id ?? null;
+  const [seenTurnId, setSeenTurnId] = useState(turnId);
+
+  if (turnId !== seenTurnId) {
+    setSeenTurnId(turnId);
+    setLocalOutcomes({});
+  }
   const running = turn?.status === "running";
   const stealing = turn?.status === "stealing";
   const now = useNow(Boolean(running));
@@ -60,11 +73,18 @@ export function LocalTurnScreen({
   const secondsLeft = Math.min(rawLeft, room.turn_seconds);
   const warmingUp = running && rawLeft > room.turn_seconds;
   const timeUp = running && !paused && rawLeft <= 0;
-  const current = songs.find((row) => row.songId === state.currentSongId);
-  const stealTarget = songs.find((row) => row.outcome === null);
-  const hits = songs.filter((row) => row.outcome === "hit").length;
-  const skipped = songs.filter((row) => row.outcome === "skipped").length;
-  const settled = songs.filter((row) => row.outcome !== null).length;
+  const openSongs = songs.filter(
+    (row) => row.outcome === null && !localOutcomes[row.songId],
+  );
+  const stealTarget = openSongs[0];
+  const countOutcome = (kind: Outcome) =>
+    songs.filter(
+      (row) => row.outcome === kind ||
+        (row.outcome === null && localOutcomes[row.songId] === kind),
+    ).length;
+  const hits = countOutcome("hit");
+  const skipped = countOutcome("skipped");
+  const settled = songs.length - openSongs.length;
   const duel = turn?.twist === "duel" && !isOneOnOne(state.players);
 
   useEffect(() => {
@@ -155,8 +175,29 @@ export function LocalTurnScreen({
   }
 
   function mark(songId: string, outcome: Outcome) {
+    if (localOutcomes[songId]) {
+      return;
+    }
+
     playSound(soundFor(outcome));
-    void dispatch(() => api.markSong(room.code, token, songId, outcome));
+    setLocalOutcomes((before) => ({ ...before, [songId]: outcome }));
+
+    void api
+      .markSong(room.code, token, songId, outcome)
+      .then(() => onRefresh())
+      .catch((failure) => {
+        setLocalOutcomes((before) => {
+          const next = { ...before };
+
+          delete next[songId];
+
+          return next;
+        });
+        setError(
+          failure instanceof Error ? failure.message : copy.errors.generic,
+        );
+        void onRefresh();
+      });
   }
 
   if (!turn) {
@@ -174,6 +215,7 @@ export function LocalTurnScreen({
         warmingUp={Boolean(warmingUp)}
         score={score}
         players={state.players}
+        onTeamTap={setSongsOf}
       />
 
       {paused ? (
@@ -202,7 +244,7 @@ export function LocalTurnScreen({
             </p>
             <p className="mt-2 text-sm font-bold leading-snug opacity-80">
               {isSinger
-                ? "Aparece uma música por vez, só pra você. Cantarole só a melodia. Esqueceu como é? Abra a letra. Não conhece? Passa e vem outra."
+                ? "Você vê 5 músicas de uma vez, só na sua tela, com a letra embaixo. Cantarole a que souber. Não conhece? Passa e entra outra no lugar."
                 : "Quando o tempo começar, grite o nome da música."}
             </p>
           </div>
@@ -251,51 +293,54 @@ export function LocalTurnScreen({
       ) : null}
 
       {isSinger && running ? (
-        current?.song ? (
-          <NowSinging
-            key={current.songId}
-            song={current.song}
-            number={songs.length}
-            withLyrics
-          >
-            {duel ? (
-              <div className="grid grid-cols-2 gap-2">
-                {([team, rival] as const).map((side) => (
-                  <button
-                    key={side}
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      mark(current.songId, side === team ? "hit" : "stolen")
-                    }
-                    className={`font-display stroke-hard rounded-2xl px-2 py-3 text-lg uppercase leading-tight disabled:opacity-50 ${teamButtons[side]}`}
+        openSongs.length > 0 ? (
+          <ul className="flex w-full max-w-sm flex-col gap-3">
+            {openSongs.map((row) =>
+              row.song ? (
+                <HandCard
+                  key={row.songId}
+                  song={row.song}
+                  lyrics={state.lyricsById?.[row.songId]}
+                >
+                  {duel ? (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {([team, rival] as const).map((side) => (
+                        <button
+                          key={side}
+                          type="button"
+                          onClick={() =>
+                            mark(row.songId, side === team ? "hit" : "stolen")
+                          }
+                          className={`font-display stroke-hard rounded-xl px-2 py-2 text-sm uppercase leading-tight ${teamButtons[side]}`}
+                        >
+                          {copy.teams[side]} acertou
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <Button
+                      color="mint"
+                      size="sm"
+                      onClick={() => mark(row.songId, "hit")}
+                    >
+                      Acertou
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    color="paper"
+                    onClick={() => mark(row.songId, "skipped")}
                   >
-                    {copy.teams[side]} acertou
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <Button
-                color="mint"
-                disabled={busy}
-                onClick={() => mark(current.songId, "hit")}
-              >
-                Acertou
-              </Button>
+                    Passar
+                  </Button>
+                </HandCard>
+              ) : null,
             )}
-            <Button
-              size="sm"
-              color="paper"
-              disabled={busy}
-              onClick={() => mark(current.songId, "skipped")}
-            >
-              Passar
-            </Button>
-          </NowSinging>
+          </ul>
         ) : (
           <div className="bg-paper stroke-hard hard-shadow w-full max-w-sm rounded-2xl px-4 py-5 text-center">
             <p className="font-display text-grape text-2xl uppercase leading-tight">
-              {timeUp ? "Acabou o tempo" : "Puxando a próxima"}
+              {timeUp ? "Acabou o tempo" : "Puxando as próximas"}
             </p>
           </div>
         )
@@ -405,6 +450,14 @@ export function LocalTurnScreen({
         </p>
       ) : null}
 
+      {songsOf ? (
+        <TeamSongsModal
+          team={songsOf}
+          code={room.code}
+          token={token}
+          onClose={() => setSongsOf(null)}
+        />
+      ) : null}
     </main>
   );
 }

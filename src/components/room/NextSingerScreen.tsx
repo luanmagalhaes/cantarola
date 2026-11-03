@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { api, type RoomState } from "@/lib/api/client";
 import { copy } from "@/data/copy";
 import { nameOf } from "@/lib/game/players";
+import { TeamSongsModal } from "@/components/room/TeamSongsModal";
 import { teamBehind, teams } from "@/lib/game/rules";
 import type { Team } from "@/types/game";
 
@@ -29,6 +30,7 @@ export function NextSingerScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [songsOf, setSongsOf] = useState<Team | null>(null);
 
   const { room, players, me, turn, songs, score } = state;
   const lastTurn = turn?.status === "done" ? turn : null;
@@ -59,7 +61,16 @@ export function NextSingerScreen({
 
   return (
     <main className="confetti-dots bg-cream flex min-h-dvh flex-col items-center gap-4 px-5 pb-[calc(2rem+var(--safe-bottom))] pt-[calc(3.5rem+var(--safe-top))]">
-      <Scoreboard score={score} players={players} />
+      <Scoreboard score={score} players={players} onTeamTap={setSongsOf} />
+
+      {songsOf ? (
+        <TeamSongsModal
+          team={songsOf}
+          code={room.code}
+          token={token}
+          onClose={() => setSongsOf(null)}
+        />
+      ) : null}
 
       {me.is_host ? (
         <section className="w-full max-w-sm">

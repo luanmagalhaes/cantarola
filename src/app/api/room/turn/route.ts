@@ -20,6 +20,8 @@ import {
 import { songById } from "@/data/songs";
 import type { Outcome } from "@/types/game";
 
+export const maxDuration = 60;
+
 type Action =
   | "pick"
   | "unpick"

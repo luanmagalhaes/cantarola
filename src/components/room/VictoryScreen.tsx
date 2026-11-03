@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Scoreboard } from "@/components/room/Scoreboard";
+import { TeamSongsModal } from "@/components/room/TeamSongsModal";
 import { api, type RoomState } from "@/lib/api/client";
 import { copy } from "@/data/copy";
 import { winnerOf } from "@/lib/game/rules";
 import { playSound } from "@/lib/sound";
+import type { Team } from "@/types/game";
 
 const confettiColors = [
   "var(--color-coral)",
@@ -73,6 +75,7 @@ export function VictoryScreen({
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [songsOf, setSongsOf] = useState<Team | null>(null);
   const champion = winnerOf(state.score);
 
   useEffect(() => {
@@ -115,7 +118,17 @@ export function VictoryScreen({
           score={state.score}
           players={state.players}
           highlight={champion === "tie" ? null : champion}
+          onTeamTap={setSongsOf}
         />
+
+        {songsOf ? (
+          <TeamSongsModal
+            team={songsOf}
+            code={state.room.code}
+            token={token}
+            onClose={() => setSongsOf(null)}
+          />
+        ) : null}
 
         {state.me.is_host ? (
           <Button

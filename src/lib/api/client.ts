@@ -34,6 +34,18 @@ export interface RoomState {
   results: ResultRow[];
   now: string;
   clockOffset: number;
+  lyricsById?: Record<string, string | null>;
+}
+
+export interface SongLogItem {
+  title: string;
+  artist: string;
+  outcome: Outcome;
+}
+
+export interface TeamSongLog {
+  hits: SongLogItem[];
+  misses: SongLogItem[];
 }
 
 export interface TakeView {
@@ -311,9 +323,9 @@ export const api = {
     );
   },
 
-  lyrics(artist: string, title: string) {
-    return request<{ lyrics: string | null }>(
-      `/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`,
+  songLog(code: string, token: string) {
+    return request<{ log: Record<Team, TeamSongLog> }>(
+      `/api/room/songs?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`,
     );
   },
 

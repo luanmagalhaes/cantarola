@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { randomFace } from "@/data/faces";
 import { ServiceError, messageFor } from "@/lib/messages";
+import { findLyrics } from "@/lib/lyrics";
 import { serverClient } from "@/lib/supabase/server";
 import { songById, songsFor } from "@/data/songs";
 import {
@@ -12,6 +14,7 @@ import {
   pickTwist,
   pileOrder,
   pointsFor,
+  rivalOf,
   scoreFrom,
   scoringTeamFor,
   shuffle,
@@ -37,6 +40,8 @@ export type PlayMode = "local" | "online";
 const localSeconds = 60;
 const onlineSeconds = 90;
 const answerSeconds = 60;
+const localHandSize = 5;
+const lyricsAhead = 10;
 
 function fail(status: number): never {
   throw new ServiceError(status, messageFor(status));
@@ -491,9 +496,92 @@ async function createTurn(room: RoomRow, singer: PlayerRow): Promise<TurnRow> {
     fail(500);
   }
 
-  await dealNextSong(room, turn);
+  const handSize = room.play_mode === "local" ? localHandSize : 1;
+
+  for (let dealt = 0; dealt < handSize; dealt += 1) {
+    await dealNextSong(room, turn);
+  }
 
   return turn;
+}
+
+async function cachedLyrics(
+  songIds: string[],
+): Promise<Map<string, string | null>> {
+  if (songIds.length === 0) {
+    return new Map();
+  }
+
+  const { data } = await serverClient()
+    .from("ll_song_lyrics")
+    .select("song_id, lyrics")
+    .in("song_id", songIds);
+
+  return new Map(
+    ((data as { song_id: string; lyrics: string | null }[] | null) ?? []).map(
+      (row) => [row.song_id, row.lyrics] as const,
+    ),
+  );
+}
+
+async function fetchMissingLyrics(songIds: string[]) {
+  const known = await cachedLyrics(songIds);
+  const missing = songIds.filter((songId) => !known.has(songId));
+  const batchSize = 3;
+
+  for (let at = 0; at < missing.length; at += batchSize) {
+    await Promise.all(
+      missing.slice(at, at + batchSize).map(async (songId) => {
+        const song = songById(songId);
+
+        if (!song) {
+          return;
+        }
+
+        const lyrics = await findLyrics(song.artist, song.title);
+
+        await serverClient()
+          .from("ll_song_lyrics")
+          .upsert({ song_id: songId, lyrics });
+      }),
+    );
+  }
+}
+
+async function upcomingSongIds(
+  room: RoomRow,
+  turn: TurnRow,
+): Promise<string[]> {
+  const hand = (await turnSongs(turn.id))
+    .filter((row) => row.outcome === null)
+    .map((row) => row.song_id);
+
+  const { data } = await serverClient()
+    .from("ll_draw_pile")
+    .select("song_id")
+    .eq("room_id", room.id)
+    .order("position", { ascending: true })
+    .limit(lyricsAhead);
+
+  const ahead = ((data as { song_id: string }[] | null) ?? []).map(
+    (row) => row.song_id,
+  );
+
+  return [...new Set([...hand, ...ahead])];
+}
+
+function prefetchLyrics(room: RoomRow, turn: TurnRow) {
+  if (room.play_mode !== "local") {
+    return;
+  }
+
+  after(async () => {
+    try {
+      await fetchMissingLyrics(await upcomingSongIds(room, turn));
+    } catch {
+      return;
+    }
+  });
 }
 
 export async function dealNextSong(room: RoomRow, turn: TurnRow) {
@@ -613,6 +701,8 @@ export async function startGame(room: RoomRow, me: PlayerRow) {
 
     fail(409);
   }
+
+  prefetchLyrics(room, firstTurn);
 }
 
 export async function chooseSinger(
@@ -673,6 +763,8 @@ export async function chooseSinger(
 
     fail(409);
   }
+
+  prefetchLyrics(room, next);
 }
 
 async function lastFinishedTurnId(room: RoomRow): Promise<string | null> {
@@ -844,10 +936,12 @@ export async function markSong(
     throw new ServiceError(409, "Essa música já saiu da sua vez.");
   }
 
-  const current = stealing ? null : await currentSongFor(room, turn, songs);
+  if (!stealing && room.play_mode === "online") {
+    const current = await currentSongFor(room, turn, songs);
 
-  if (!stealing && current?.song_id !== songId) {
-    throw new ServiceError(409, "Essa música já saiu da sua vez.");
+    if (current?.song_id !== songId) {
+      throw new ServiceError(409, "Essa música já saiu da sua vez.");
+    }
   }
 
   const players = await roomPlayers(room.id);
@@ -997,7 +1091,7 @@ async function dropSongsWithoutTake(
 async function finishTurn(room: RoomRow, turn: TurnRow) {
   await serverClient()
     .from("ll_turn_songs")
-    .update({ outcome: "missed" })
+    .update({ outcome: room.play_mode === "local" ? "skipped" : "missed" })
     .eq("turn_id", turn.id)
     .is("outcome", null);
 
@@ -1222,6 +1316,91 @@ export async function bombSongIdFor(
   );
 }
 
+export interface SongLogItem {
+  title: string;
+  artist: string;
+  outcome: Outcome;
+}
+
+export interface TeamSongLog {
+  hits: SongLogItem[];
+  misses: SongLogItem[];
+}
+
+export async function songLog(room: RoomRow): Promise<Record<Team, TeamSongLog>> {
+  const log: Record<Team, TeamSongLog> = {
+    red: { hits: [], misses: [] },
+    blue: { hits: [], misses: [] },
+  };
+
+  const { data: turnRows } = await serverClient()
+    .from("ll_turns")
+    .select("id, team, created_at")
+    .eq("room_id", room.id)
+    .eq("status", "done")
+    .order("created_at", { ascending: true });
+
+  const doneTurns = (turnRows as { id: string; team: Team }[] | null) ?? [];
+
+  if (doneTurns.length === 0) {
+    return log;
+  }
+
+  const teamByTurn = new Map(doneTurns.map((turn) => [turn.id, turn.team]));
+
+  const { data: songData } = await serverClient()
+    .from("ll_turn_songs")
+    .select("turn_id, song_id, outcome, position")
+    .in(
+      "turn_id",
+      doneTurns.map((turn) => turn.id),
+    )
+    .order("position", { ascending: true });
+
+  const oneOnOne = isOneOnOne(await roomPlayers(room.id));
+
+  for (const result of await roomResults(room.id)) {
+    const scorer = result.scoring_team;
+    const song = songById(result.song_id);
+
+    if (!scorer || !song || !teamByTurn.has(result.turn_id)) {
+      continue;
+    }
+
+    log[scorer].hits.push({
+      title: song.title,
+      artist: song.artist,
+      outcome: result.outcome,
+    });
+  }
+
+  for (const row of (songData as TurnSongRow[] | null) ?? []) {
+    if (row.outcome === null || row.outcome === "hit") {
+      continue;
+    }
+
+    const singingTeam = teamByTurn.get(row.turn_id);
+    const song = songById(row.song_id);
+
+    if (!singingTeam || !song) {
+      continue;
+    }
+
+    const loser =
+      row.outcome === "stolen" || !oneOnOne
+        ? singingTeam
+        : rivalOf(singingTeam);
+
+    log[loser].misses.push({
+      title: song.title,
+      artist: song.artist,
+      outcome: row.outcome,
+    });
+  }
+
+  return log;
+}
+
 export async function roomState(room: RoomRow, me: PlayerRow) {
   const [players, results] = await Promise.all([
     roomPlayers(room.id),
@@ -1236,8 +1415,19 @@ export async function roomState(room: RoomRow, me: PlayerRow) {
     turn && isSinger && turn.status === "running"
       ? await currentSongFor(room, turn, songs)
       : null;
+  const lyricsById =
+    turn && isSinger && room.play_mode === "local" && turn.status !== "done"
+      ? Object.fromEntries(
+          await cachedLyrics(
+            songs
+              .filter((row) => row.outcome === null)
+              .map((row) => row.song_id),
+          ),
+        )
+      : undefined;
 
   return {
+    lyricsById,
     room,
     players,
     turn:

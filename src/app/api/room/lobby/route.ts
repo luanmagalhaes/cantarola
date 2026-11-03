@@ -15,6 +15,8 @@ import {
 } from "@/lib/game/service";
 import type { DeckMode, Team, Twist } from "@/types/game";
 
+export const maxDuration = 60;
+
 type Action = "team" | "deck" | "twists" | "draw" | "start" | "restart";
 
 interface Body {

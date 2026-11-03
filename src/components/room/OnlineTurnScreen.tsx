@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NowSinging } from "@/components/game/NowSinging";
 import { PreviewGate } from "@/components/game/PreviewGate";
+import { TeamSongsModal } from "@/components/room/TeamSongsModal";
 import { TurnHeader } from "@/components/game/TurnHeader";
 import { TakeList, type GuessFeedback } from "@/components/room/TakeList";
 import { Button } from "@/components/ui/Button";
@@ -15,7 +16,7 @@ import { rivalOf } from "@/lib/game/rules";
 import { playSound } from "@/lib/sound";
 import { TurnControls } from "@/components/room/TurnControls";
 import { VoiceNote } from "@/components/ui/VoiceNote";
-import type { Song } from "@/types/game";
+import type { Song, Team } from "@/types/game";
 
 const takesIntervalMs = 2500;
 
@@ -31,6 +32,7 @@ export function OnlineTurnScreen({
   const [takes, setTakes] = useState<TakeView[]>([]);
   const [target, setTarget] = useState<string | null>(null);
   const [preview, setPreview] = useState<Song | null>(null);
+  const [songsOf, setSongsOf] = useState<Team | null>(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [feedback, setFeedback] = useState<GuessFeedback | null>(null);
@@ -254,6 +256,7 @@ export function OnlineTurnScreen({
         warmingUp={Boolean(warmingUp)}
         score={score}
         players={state.players}
+        onTeamTap={setSongsOf}
       />
 
       {paused ? (
@@ -564,6 +567,15 @@ export function OnlineTurnScreen({
           song={preview}
           autoPlay
           onClose={() => setPreview(null)}
+        />
+      ) : null}
+
+      {songsOf ? (
+        <TeamSongsModal
+          team={songsOf}
+          code={room.code}
+          token={token}
+          onClose={() => setSongsOf(null)}
         />
       ) : null}
     </main>

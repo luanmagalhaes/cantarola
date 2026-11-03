@@ -11,11 +11,13 @@ export function Scoreboard({
   players,
   highlight,
   pulsing,
+  onTeamTap,
 }: {
   score: Score;
   players?: PlayerRow[];
   highlight?: Team | null;
   pulsing?: Team | null;
+  onTeamTap?: (team: Team) => void;
 }) {
   return (
     <div className="flex w-full max-w-sm items-stretch gap-2">
@@ -24,13 +26,8 @@ export function Scoreboard({
           .filter((player) => player.team === team)
           .map((player) => player.name);
 
-        return (
-          <div
-            key={team}
-            className={`stroke-hard hard-shadow flex flex-1 flex-col items-center rounded-2xl py-2 ${
-              backgrounds[team]
-            } ${highlight === team ? "scale-105" : "opacity-90"}`}
-          >
+        const face = (
+          <>
             <span className="font-display text-paper pb-1 text-xs uppercase tracking-wider">
               {copy.teams[team]}
             </span>
@@ -49,6 +46,26 @@ export function Scoreboard({
                 {names.join(" · ")}
               </span>
             ) : null}
+          </>
+        );
+
+        const skin = `stroke-hard hard-shadow flex flex-1 flex-col items-center rounded-2xl py-2 ${
+          backgrounds[team]
+        } ${highlight === team ? "scale-105" : "opacity-90"}`;
+
+        return onTeamTap ? (
+          <button
+            key={team}
+            type="button"
+            onClick={() => onTeamTap(team)}
+            aria-label={`Ver as músicas do time ${copy.teams[team]}`}
+            className={`${skin} cursor-pointer transition-transform active:scale-95`}
+          >
+            {face}
+          </button>
+        ) : (
+          <div key={team} className={skin}>
+            {face}
           </div>
         );
       })}
