@@ -23,6 +23,7 @@ import {
 } from "@/lib/game/rules";
 import type {
   DeckMode,
+  MatchEnding,
   Outcome,
   PlayerRow,
   ResultRow,
@@ -690,6 +691,7 @@ export async function startGame(room: RoomRow, me: PlayerRow) {
       status: "playing",
       current_turn_id: firstTurn.id,
       round_number: 1,
+      started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", room.id)
@@ -1146,7 +1148,7 @@ async function songsSung(roomId: string): Promise<number> {
   return count ?? 0;
 }
 
-async function saveMatch(room: RoomRow, players: PlayerRow[]) {
+async function saveMatch(room: RoomRow, players: PlayerRow[], closedBy: MatchEnding = "target") {
   if (room.is_test || players.every((player) => player.spoke_count === 0)) {
     return;
   }
@@ -1158,6 +1160,7 @@ async function saveMatch(room: RoomRow, players: PlayerRow[]) {
     .from("ll_matches")
     .insert({
       room_code: room.code,
+      closed_by: closedBy,
       deck_mode: room.deck_mode,
       score_red: score.red,
       score_blue: score.blue,
@@ -1442,4 +1445,42 @@ export async function roomState(room: RoomRow, me: PlayerRow) {
     results: results.slice(-12),
     now: new Date().toISOString(),
   };
+}
+
+export const staleMatchHours = 5;
+
+export async function closeStaleMatches(): Promise<string[]> {
+  const client = serverClient();
+  const deadline = new Date(Date.now() - staleMatchHours * 60 * 60 * 1000).toISOString();
+  const { data } = await client
+    .from("ll_rooms")
+    .select("*")
+    .eq("status", "playing")
+    .lt("started_at", deadline);
+
+  const stale = (data ?? []) as RoomRow[];
+  const closed: string[] = [];
+
+  for (const room of stale) {
+    const players = await roomPlayers(room.id);
+    const { data: done } = await client
+      .from("ll_rooms")
+      .update({
+        status: "done",
+        current_turn_id: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", room.id)
+      .eq("status", "playing")
+      .select("id");
+
+    if (!wasClaimed(done)) {
+      continue;
+    }
+
+    await saveMatch(room, players, "timeout");
+    closed.push(room.code);
+  }
+
+  return closed;
 }

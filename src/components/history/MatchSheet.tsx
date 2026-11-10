@@ -6,6 +6,11 @@ import { copy } from "@/data/copy";
 import { playSound } from "@/lib/sound";
 import type { DeckMode, MatchRow, Team } from "@/types/game";
 
+const endings = {
+  target: "foi até o fim",
+  timeout: "largada pela metade",
+} as const;
+
 const backgrounds: Record<Team, string> = {
   red: "bg-team-red",
   blue: "bg-team-blue",
@@ -129,7 +134,8 @@ export function MatchSheet({
 
           <p className="font-display mt-3 text-center text-xs uppercase opacity-70">
             {match.songs_played}{" "}
-            {match.songs_played === 1 ? "música cantada" : "músicas cantadas"}
+            {match.songs_played === 1 ? "música cantada" : "músicas cantadas"} ·{" "}
+            {endings[match.closed_by] ?? endings.target}
           </p>
         </div>
 
