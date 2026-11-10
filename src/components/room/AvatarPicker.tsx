@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Avatar } from "@/components/ui/Avatar";
+import { PhotoCropper } from "@/components/ui/PhotoCropper";
+import { ZoomablePhoto } from "@/components/ui/ZoomablePhoto";
 import { faces } from "@/data/faces";
 import { api } from "@/lib/api/client";
-import { shrinkToBlob } from "@/lib/photo";
 import { playSound } from "@/lib/sound";
 import type { PlayerRow } from "@/types/game";
 
@@ -21,6 +21,7 @@ export function AvatarPicker({
 }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
+  const [cropping, setCropping] = useState<File | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   async function run(action: () => Promise<unknown>) {
@@ -43,8 +44,20 @@ export function AvatarPicker({
 
   return (
     <div className="bg-paper stroke-hard hard-shadow w-full max-w-sm rounded-2xl px-4 py-3">
+      {cropping ? (
+        <PhotoCropper
+          file={cropping}
+          busy={busy}
+          onCancel={() => setCropping(null)}
+          onDone={(photo) => {
+            setCropping(null);
+            void run(() => api.setPhoto(code, token, photo));
+          }}
+        />
+      ) : null}
+
       <div className="flex items-center gap-3">
-        <Avatar name={me.name} photo={me.avatar} emoji={me.emoji} size="lg" />
+        <ZoomablePhoto name={me.name} photo={me.avatar} emoji={me.emoji} size="lg" />
         <div className="min-w-0 flex-1">
           <p className="font-display text-grape text-lg uppercase leading-tight">
             Sua cara
@@ -90,11 +103,7 @@ export function AvatarPicker({
             return;
           }
 
-          void run(async () => {
-            const small = await shrinkToBlob(picked);
-
-            await api.setPhoto(code, token, small);
-          });
+          setCropping(picked);
         }}
       />
 
