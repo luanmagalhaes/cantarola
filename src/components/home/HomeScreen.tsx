@@ -12,7 +12,7 @@ import { saveSession } from "@/lib/session";
 import { preloadSounds } from "@/lib/sound";
 import type { PlayMode } from "@/types/game";
 
-type Step = "mode" | "choice" | "joining";
+type Step = "mode" | "choice" | "creating" | "joining";
 
 export function HomeScreen() {
   const router = useRouter();
@@ -41,6 +41,11 @@ export function HomeScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function goTo(next: Step) {
+    setError("");
+    setStep(next);
   }
 
   function enter(session: { code: string; token: string; playerId: string }) {
@@ -108,48 +113,64 @@ export function HomeScreen() {
             Versão {copy.modes[playMode].title}
           </p>
 
-          <label className="font-display text-grape text-lg uppercase tracking-wide">
-            {copy.home.nameField}
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={copy.home.namePlaceholder}
-              maxLength={16}
-              className="bg-paper stroke-hard hard-shadow font-sans mt-2 w-full rounded-2xl px-4 py-3 text-xl font-bold outline-none placeholder:opacity-40"
-            />
-          </label>
-
           {step === "choice" ? (
             <div className="flex flex-col gap-3">
-              <Button color="coral" disabled={busy} onClick={createRoom}>
-                {busy ? "Criando..." : copy.home.create}
+              <Button color="coral" onClick={() => goTo("creating")}>
+                {copy.home.create}
               </Button>
-              <Button color="gold" onClick={() => setStep("joining")}>
+              <Button color="gold" onClick={() => goTo("joining")}>
                 {copy.home.join}
               </Button>
-              <Button color="paper" onClick={() => setStep("mode")}>
+              <Button color="paper" onClick={() => goTo("mode")}>
                 {copy.home.changeMode}
               </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              {step === "joining" ? (
+                <label className="font-display text-grape text-lg uppercase tracking-wide">
+                  {copy.home.codeField}
+                  <input
+                    autoFocus
+                    value={code}
+                    onChange={(event) =>
+                      setCode(event.target.value.replace(/\D/g, "").slice(0, 2))
+                    }
+                    placeholder={copy.home.codePlaceholder}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className="bg-paper stroke-hard hard-shadow font-display mt-2 w-full rounded-2xl px-4 py-3 text-center text-5xl leading-tight tracking-[0.3em] outline-none placeholder:opacity-30"
+                  />
+                </label>
+              ) : null}
+
               <label className="font-display text-grape text-lg uppercase tracking-wide">
-                {copy.home.codeField}
+                {copy.home.nameField}
                 <input
-                  value={code}
-                  onChange={(event) =>
-                    setCode(event.target.value.replace(/\D/g, "").slice(0, 2))
-                  }
-                  placeholder={copy.home.codePlaceholder}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="bg-paper stroke-hard hard-shadow font-display mt-2 w-full rounded-2xl px-4 py-3 text-center text-5xl leading-tight tracking-[0.3em] outline-none placeholder:opacity-30"
+                  autoFocus={step === "creating"}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder={copy.home.namePlaceholder}
+                  maxLength={16}
+                  className="bg-paper stroke-hard hard-shadow font-sans mt-2 w-full rounded-2xl px-4 py-3 text-xl font-bold outline-none placeholder:opacity-40"
                 />
               </label>
-              <Button color="gold" disabled={busy} onClick={joinRoom}>
-                {busy ? "Entrando..." : copy.home.confirmJoin}
-              </Button>
-              <Button color="paper" onClick={() => setStep("choice")}>
+
+              {step === "creating" ? (
+                <Button color="coral" disabled={busy} onClick={createRoom}>
+                  {busy ? "Criando..." : copy.home.create}
+                </Button>
+              ) : (
+                <Button color="gold" disabled={busy} onClick={joinRoom}>
+                  {busy ? "Entrando..." : copy.home.confirmJoin}
+                </Button>
+              )}
+
+              <Button
+                color="paper"
+                disabled={busy}
+                onClick={() => goTo("choice")}
+              >
                 {copy.home.back}
               </Button>
             </div>

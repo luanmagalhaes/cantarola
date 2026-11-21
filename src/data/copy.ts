@@ -36,6 +36,14 @@ export const copy = {
     rules: "Como se joga",
     history: "Histórico",
   },
+  avatar: {
+    change: "Trocar a foto",
+    add: "Pôr uma foto",
+    sending: "Subindo",
+    close: "Fechar",
+    closeHint: "Toque para fechar",
+    mine: "Minha cara",
+  },
   teams: {
     red: "Vermelho",
     blue: "Azul",

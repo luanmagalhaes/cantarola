@@ -6,6 +6,7 @@ import { HowToPlay } from "@/components/game/HowToPlay";
 import { ChatBubble } from "@/components/room/ChatBubble";
 import { LeaveButton } from "@/components/room/LeaveButton";
 import { LobbyScreen } from "@/components/room/LobbyScreen";
+import { MyFace } from "@/components/room/MyFace";
 import { LocalTurnScreen } from "@/components/room/LocalTurnScreen";
 import { NextSingerScreen } from "@/components/room/NextSingerScreen";
 import { OnlineTurnScreen } from "@/components/room/OnlineTurnScreen";
@@ -95,6 +96,7 @@ export function RoomApp({ code }: { code: string }) {
     <>
       <SoundToggle />
       <LeaveButton />
+      <MyFace code={code} token={token} me={state.me} onDone={refresh} />
       {online ? (
         <ChatBubble code={code} token={token} myId={state.me.id} />
       ) : null}
