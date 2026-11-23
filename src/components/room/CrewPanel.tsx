@@ -37,6 +37,7 @@ export function CrewPanel({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
   const [removing, setRemoving] = useState<PlayerRow | null>(null);
+  const [moving, setMoving] = useState<PlayerRow | null>(null);
 
   async function run(action: () => Promise<unknown>) {
     if (busy) {
@@ -101,16 +102,7 @@ export function CrewPanel({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() =>
-                  void run(() =>
-                    api.movePlayer(
-                      code,
-                      token,
-                      person.id,
-                      otherTeam(person.team),
-                    ),
-                  )
-                }
+                onClick={() => setMoving(person)}
                 className={`font-display stroke-thin rounded-full px-3 py-1.5 text-xs uppercase disabled:opacity-50 ${teamSkins[otherTeam(person.team)]}`}
               >
                 Passar para o {copy.teams[otherTeam(person.team)]}
@@ -143,6 +135,46 @@ export function CrewPanel({
           Fechar
         </Button>
       </div>
+
+      {moving ? (
+        <div className="bg-grape/90 fixed inset-0 z-[95] flex flex-col overflow-y-auto px-4 pb-[calc(1.5rem+var(--safe-bottom))] pt-[calc(1.5rem+var(--safe-top))]">
+          <div className="bg-paper stroke-hard hard-shadow m-auto flex w-full max-w-sm shrink-0 flex-col gap-3 rounded-2xl p-4 text-center">
+            <p className="font-display text-grape text-xl uppercase leading-tight">
+              Passar {moving.name} para o {copy.teams[otherTeam(moving.team)]}?
+            </p>
+            <p className="text-grape text-sm font-bold leading-snug">
+              A pessoa muda de time na hora. Os pontos que ela já fez continuam
+              com o time de antes.
+            </p>
+            <Button
+              color="coral"
+              disabled={busy}
+              onClick={() => {
+                const target = moving;
+
+                setMoving(null);
+                void run(() =>
+                  api.movePlayer(
+                    code,
+                    token,
+                    target.id,
+                    otherTeam(target.team),
+                  ),
+                );
+              }}
+            >
+              Pode passar
+            </Button>
+            <Button
+              color="paper"
+              disabled={busy}
+              onClick={() => setMoving(null)}
+            >
+              {copy.home.back}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {removing ? (
         <div className="bg-grape/90 fixed inset-0 z-[95] flex flex-col overflow-y-auto px-4 pb-[calc(1.5rem+var(--safe-bottom))] pt-[calc(1.5rem+var(--safe-top))]">
