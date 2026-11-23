@@ -268,7 +268,7 @@ export function OnlineTurnScreen({
       <TurnControls
         code={room.code}
         token={token}
-        canPause={Boolean(running) && (isSinger || state.me.is_host)}
+        canPause={Boolean(running)}
         paused={Boolean(paused)}
         canUndo={state.me.is_host && state.results.length > 0}
         busy={busy}

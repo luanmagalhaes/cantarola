@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { api, type RoomState } from "@/lib/api/client";
 import { copy } from "@/data/copy";
 import { leftMsFor, useNow } from "@/hooks/useNow";
+import { nextHandOrder } from "@/lib/game/hand";
 import { nameOf } from "@/lib/game/players";
 import { isOneOnOne, rivalOf } from "@/lib/game/rules";
 import { playSound } from "@/lib/sound";
@@ -43,6 +44,8 @@ export function LocalTurnScreen({
     {},
   );
   const [songsOf, setSongsOf] = useState<Team | null>(null);
+  const [handOrder, setHandOrder] = useState<string[]>([]);
+  const [seenOpenKey, setSeenOpenKey] = useState("");
   const lastResultId = useRef<string | null>(null);
   const closing = useRef(false);
 
@@ -53,6 +56,8 @@ export function LocalTurnScreen({
   if (turnId !== seenTurnId) {
     setSeenTurnId(turnId);
     setLocalOutcomes({});
+    setHandOrder([]);
+    setSeenOpenKey("");
   }
   const running = turn?.status === "running";
   const stealing = turn?.status === "stealing";
@@ -76,7 +81,19 @@ export function LocalTurnScreen({
   const openSongs = songs.filter(
     (row) => row.outcome === null && !localOutcomes[row.songId],
   );
-  const stealTarget = openSongs[0];
+  const openIds = openSongs.map((row) => row.songId);
+  const openKey = openIds.join("|");
+
+  if (openKey !== seenOpenKey) {
+    setSeenOpenKey(openKey);
+    setHandOrder((previous) => nextHandOrder(previous, openIds));
+  }
+
+  const orderedHand = handOrder
+    .map((songId) => openSongs.find((row) => row.songId === songId))
+    .filter((row): row is (typeof openSongs)[number] => Boolean(row));
+  const hand = orderedHand.length === openSongs.length ? orderedHand : openSongs;
+  const stealTarget = hand[0];
   const countOutcome = (kind: Outcome) =>
     songs.filter(
       (row) => row.outcome === kind ||
@@ -227,7 +244,7 @@ export function LocalTurnScreen({
       <TurnControls
         code={room.code}
         token={token}
-        canPause={Boolean(running) && (isSinger || state.me.is_host)}
+        canPause={Boolean(running)}
         paused={Boolean(paused)}
         canUndo={state.me.is_host && state.results.length > 0}
         busy={busy}
@@ -295,7 +312,7 @@ export function LocalTurnScreen({
       {isSinger && running ? (
         openSongs.length > 0 ? (
           <ul className="flex w-full max-w-sm flex-col gap-3">
-            {openSongs.map((row) =>
+            {hand.map((row) =>
               row.song ? (
                 <HandCard
                   key={row.songId}

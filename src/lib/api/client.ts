@@ -25,6 +25,7 @@ export interface TurnSongView {
 export interface RoomState {
   room: RoomRow;
   players: PlayerRow[];
+  waiting: PlayerRow[];
   turn: TurnRow | null;
   me: PlayerRow;
   isSinger: boolean;
@@ -137,6 +138,22 @@ export const api = {
 
   restart(code: string, token: string) {
     return lobby(code, token, "restart");
+  },
+
+  approveWaiting(code: string, token: string, playerId: string, team: Team) {
+    return lobby(code, token, "approve", { playerId, team });
+  },
+
+  restoreSeat(code: string, token: string, playerId: string, targetId: string) {
+    return lobby(code, token, "restore", { playerId, targetId });
+  },
+
+  removePlayer(code: string, token: string, playerId: string) {
+    return lobby(code, token, "remove", { playerId });
+  },
+
+  movePlayer(code: string, token: string, playerId: string, team: Team | null) {
+    return lobby(code, token, "move", { playerId, team });
   },
 
   chooseSinger(code: string, token: string, singerId: string) {

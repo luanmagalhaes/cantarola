@@ -11,7 +11,7 @@ import { copy } from "@/data/copy";
 import { nameOf } from "@/lib/game/players";
 import { TeamSongsModal } from "@/components/room/TeamSongsModal";
 import { teamBehind, teams } from "@/lib/game/rules";
-import type { Team } from "@/types/game";
+import type { PlayerRow, Team } from "@/types/game";
 
 const teamColors: Record<Team, string> = {
   red: "bg-team-red",
@@ -30,6 +30,9 @@ export function NextSingerScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [confirmingSinger, setConfirmingSinger] = useState<PlayerRow | null>(
+    null,
+  );
   const [songsOf, setSongsOf] = useState<Team | null>(null);
 
   const { room, players, me, turn, songs, score } = state;
@@ -99,11 +102,7 @@ export function NextSingerScreen({
                       key={player.id}
                       type="button"
                       disabled={busy}
-                      onClick={() =>
-                        void dispatch(() =>
-                          api.chooseSinger(room.code, token, player.id),
-                        )
-                      }
+                      onClick={() => setConfirmingSinger(player)}
                       className="bg-paper text-grape stroke-thin font-display flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm uppercase leading-none transition-transform active:scale-95 disabled:opacity-50"
                     >
                       <Avatar
@@ -181,6 +180,46 @@ export function NextSingerScreen({
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {confirmingSinger ? (
+        <div className="bg-grape/85 fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div
+            className="bg-paper stroke-hard w-full max-w-sm rounded-3xl p-5 text-center shadow-[0_12px_0_var(--color-grape)]"
+            style={{ animation: "bounce-in 0.4s both" }}
+          >
+            <p className="font-display text-grape text-2xl uppercase leading-tight">
+              {confirmingSinger.name} vai cantarolar?
+            </p>
+            <p className="mt-2 text-sm font-bold leading-snug opacity-75">
+              A vez passa para essa pessoa. O relógio só começa quando ela
+              estiver pronta e tocar em começar.
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <Button
+                color="coral"
+                disabled={busy}
+                onClick={() => {
+                  const singer = confirmingSinger;
+
+                  setConfirmingSinger(null);
+                  void dispatch(() =>
+                    api.chooseSinger(room.code, token, singer.id),
+                  );
+                }}
+              >
+                É essa pessoa
+              </Button>
+              <Button
+                color="paper"
+                disabled={busy}
+                onClick={() => setConfirmingSinger(null)}
+              >
+                {copy.home.back}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {confirmingEnd ? (

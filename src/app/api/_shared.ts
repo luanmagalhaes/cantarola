@@ -81,6 +81,7 @@ export async function roomPlayers(roomId: string): Promise<PlayerRow[]> {
     .from("ll_players")
     .select("*")
     .eq("room_id", roomId)
+    .gte("seat", 0)
     .order("seat", { ascending: true });
 
   return (data as PlayerRow[] | null) ?? [];

@@ -19,6 +19,7 @@ import {
   scoringTeamFor,
   shuffle,
   isOneOnOne,
+  teams,
   winnerOf,
 } from "@/lib/game/rules";
 import type {
@@ -150,9 +151,14 @@ export async function joinRoom(code: string, rawName: string) {
 
   const room = await roomByCode(code);
 
-  if (room.status !== "lobby") {
-    fail(409);
+  if (room.status === "done") {
+    throw new ServiceError(
+      409,
+      "Essa partida já acabou. Peça para abrirem outra sala.",
+    );
   }
+
+  const waiting = room.status !== "lobby";
 
   const { count } = await serverClient()
     .from("ll_players")
@@ -165,7 +171,7 @@ export async function joinRoom(code: string, rawName: string) {
       room_id: room.id,
       name,
       team: null,
-      seat: count ?? 0,
+      seat: waiting ? waitingSeat : (count ?? 0),
       emoji: randomFace(await facesTaken(room.id)),
     })
     .select("*")
@@ -235,9 +241,190 @@ async function roomPlayers(roomId: string): Promise<PlayerRow[]> {
     .from("ll_players")
     .select("*")
     .eq("room_id", roomId)
+    .gte("seat", 0)
     .order("seat", { ascending: true });
 
   return (data as PlayerRow[] | null) ?? [];
+}
+
+export async function waitingPlayers(roomId: string): Promise<PlayerRow[]> {
+  const { data } = await serverClient()
+    .from("ll_players")
+    .select("*")
+    .eq("room_id", roomId)
+    .lt("seat", 0)
+    .order("created_at", { ascending: true });
+
+  return (data as PlayerRow[] | null) ?? [];
+}
+
+async function nextSeat(roomId: string): Promise<number> {
+  const seated = await roomPlayers(roomId);
+
+  return seated.reduce((highest, one) => Math.max(highest, one.seat), -1) + 1;
+}
+
+function requireHost(me: PlayerRow) {
+  if (!me.is_host) {
+    throw new ServiceError(403, "Só quem abriu a sala pode fazer isso.");
+  }
+}
+
+export async function approveWaiting(
+  room: RoomRow,
+  me: PlayerRow,
+  playerId: string,
+  team: Team,
+) {
+  requireHost(me);
+
+  if (!teams.includes(team)) {
+    throw new ServiceError(400, "Escolha um time válido.");
+  }
+
+  const waiting = await waitingPlayers(room.id);
+  const target = waiting.find((one) => one.id === playerId);
+
+  if (!target) {
+    throw new ServiceError(404, "Essa pessoa não está mais esperando.");
+  }
+
+  await serverClient()
+    .from("ll_players")
+    .update({ team, seat: await nextSeat(room.id) })
+    .eq("id", target.id);
+}
+
+export async function restoreSeat(
+  room: RoomRow,
+  me: PlayerRow,
+  playerId: string,
+  targetId: string,
+) {
+  requireHost(me);
+
+  const waiting = (await waitingPlayers(room.id)).find(
+    (one) => one.id === playerId,
+  );
+  const target = (await roomPlayers(room.id)).find((one) => one.id === targetId);
+
+  if (!waiting) {
+    throw new ServiceError(404, "Essa pessoa não está mais esperando.");
+  }
+
+  if (!target) {
+    throw new ServiceError(404, "Essa pessoa não está mais na sala.");
+  }
+
+  const client = serverClient();
+
+  await client.from("ll_player_secrets").delete().eq("player_id", target.id);
+
+  const { error } = await client
+    .from("ll_player_secrets")
+    .update({ player_id: target.id })
+    .eq("player_id", waiting.id);
+
+  if (error) {
+    throw new ServiceError(
+      500,
+      "Não consegui devolver o lugar agora. Tente de novo.",
+    );
+  }
+
+  if (waiting.avatar && !target.avatar) {
+    await client
+      .from("ll_players")
+      .update({ avatar: waiting.avatar })
+      .eq("id", target.id);
+  }
+
+  await client.from("ll_players").delete().eq("id", waiting.id);
+}
+
+async function freeSingerSpot(room: RoomRow, playerId: string) {
+  const turn = await currentTurn(room);
+
+  if (!turn || turn.singer_id !== playerId) {
+    return;
+  }
+
+  if (turn.status !== "ready") {
+    throw new ServiceError(
+      409,
+      "Essa pessoa está cantando agora. Espere a vez acabar.",
+    );
+  }
+
+  if (!(await discardReadyTurn(room, turn))) {
+    throw new ServiceError(409, "A vez já começou. Espere ela acabar.");
+  }
+
+  await serverClient()
+    .from("ll_rooms")
+    .update({
+      current_turn_id: await lastFinishedTurnId(room),
+      round_number: Math.max(0, room.round_number - 1),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", room.id)
+    .eq("current_turn_id", turn.id);
+}
+
+export async function removePlayer(
+  room: RoomRow,
+  me: PlayerRow,
+  playerId: string,
+) {
+  requireHost(me);
+
+  if (playerId === me.id) {
+    throw new ServiceError(422, "Para sair da sala use o botão de sair.");
+  }
+
+  const everyone = [
+    ...(await roomPlayers(room.id)),
+    ...(await waitingPlayers(room.id)),
+  ];
+  const target = everyone.find((one) => one.id === playerId);
+
+  if (!target) {
+    throw new ServiceError(404, "Essa pessoa não está mais na sala.");
+  }
+
+  await freeSingerSpot(room, target.id);
+
+  await serverClient().from("ll_players").delete().eq("id", target.id);
+}
+
+export async function movePlayerTeam(
+  room: RoomRow,
+  me: PlayerRow,
+  playerId: string,
+  team: Team | null,
+) {
+  requireHost(me);
+
+  if (team !== null && !teams.includes(team)) {
+    throw new ServiceError(400, "Escolha um time válido.");
+  }
+
+  const target = (await roomPlayers(room.id)).find((one) => one.id === playerId);
+
+  if (!target) {
+    throw new ServiceError(404, "Essa pessoa não está mais na sala.");
+  }
+
+  if (target.team === team) {
+    return;
+  }
+
+  await freeSingerSpot(room, target.id);
+
+  await serverClient()
+    .from("ll_players")
+    .update({ team })
+    .eq("id", target.id);
 }
 
 async function roomResults(roomId: string): Promise<ResultRow[]> {
@@ -338,6 +525,8 @@ export async function shuffleTeams(room: RoomRow, me: PlayerRow) {
     ),
   );
 }
+
+const waitingSeat = -1;
 
 const songRestHours = 24;
 
@@ -1179,10 +1368,6 @@ export async function pauseTurn(room: RoomRow, me: PlayerRow) {
     fail(409);
   }
 
-  if (!me.is_host && turn.singer_id !== me.id) {
-    throw new ServiceError(403, "Só quem canta ou quem criou a sala pausa.");
-  }
-
   if (turn.paused_at) {
     return;
   }
@@ -1198,10 +1383,6 @@ export async function resumeTurn(room: RoomRow, me: PlayerRow) {
 
   if (!turn || turn.status !== "running") {
     fail(409);
-  }
-
-  if (!me.is_host && turn.singer_id !== me.id) {
-    throw new ServiceError(403, "Só quem canta ou quem criou a sala pausa.");
   }
 
   if (!turn.paused_at || !turn.ends_at) {
@@ -1433,6 +1614,7 @@ export async function roomState(room: RoomRow, me: PlayerRow) {
     lyricsById,
     room,
     players,
+    waiting: me.is_host ? await waitingPlayers(room.id) : [],
     turn:
       turn && revealed
         ? { ...turn, bomb_song_id: await bombSongIdFor(turn, songs) }

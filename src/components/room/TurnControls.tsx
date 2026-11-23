@@ -52,56 +52,56 @@ export function TurnControls({
 
   return (
     <div className="flex w-full max-w-sm flex-col gap-2">
-      <div className="flex gap-2">
-        {canPause ? (
-          <Button
-            size="sm"
-            color={paused ? "lemon" : "paper"}
-            disabled={working || busy}
-            onClick={() => {
-              playSound("tap");
-              void run(() =>
-                paused
-                  ? api.resumeTurn(code, token)
-                  : api.pauseTurn(code, token),
+      {canPause ? (
+        <Button
+          color={paused ? "lemon" : "coral"}
+          disabled={working || busy}
+          onClick={() => {
+            playSound("tap");
+            void run(() =>
+              paused
+                ? api.resumeTurn(code, token)
+                : api.pauseTurn(code, token),
+            );
+          }}
+        >
+          {paused ? "Voltar o tempo" : "Parar o tempo"}
+        </Button>
+      ) : null}
+
+      {canUndo ? (
+        <Button
+          size="sm"
+          color="paper"
+          disabled={working || busy}
+          onClick={() => {
+            playSound("tap");
+            void run(async () => {
+              const result = await api.undoResult(code, token);
+
+              setUndone(
+                result && typeof result === "object" && "undone" in result
+                  ? String((result as { undone?: string }).undone ?? "")
+                  : "",
               );
-            }}
-          >
-            {paused ? "Voltar o tempo" : "Pausar"}
-          </Button>
-        ) : null}
-
-        {canUndo ? (
-          <Button
-            size="sm"
-            color="paper"
-            disabled={working || busy}
-            onClick={() => {
-              playSound("tap");
-              void run(async () => {
-                const result = await api.undoResult(code, token);
-
-                setUndone(
-                  result.song
-                    ? `Tirei o ponto de "${result.song}"`
-                    : "Tirei a última jogada",
-                );
-              });
-            }}
-          >
-            Tirar ponto
-          </Button>
-        ) : null}
-      </div>
+            });
+          }}
+        >
+          Desfazer a última
+        </Button>
+      ) : null}
 
       {undone ? (
-        <p className="font-display bg-lemon text-grape stroke-thin rounded-xl px-3 py-1.5 text-center text-xs uppercase leading-snug">
-          {undone}
+        <p className="font-display text-grape text-center text-xs uppercase opacity-80">
+          Voltou: {undone}
         </p>
       ) : null}
 
       {error ? (
-        <p className="font-display bg-coral text-paper stroke-thin rounded-xl px-3 py-1.5 text-center text-xs uppercase leading-snug">
+        <p
+          role="alert"
+          className="bg-coral text-paper stroke-thin font-display rounded-xl px-3 py-1.5 text-center text-xs uppercase"
+        >
           {error}
         </p>
       ) : null}

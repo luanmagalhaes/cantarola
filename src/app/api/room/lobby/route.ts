@@ -6,7 +6,11 @@ import {
   roomByCode,
 } from "@/app/api/_shared";
 import {
+  approveWaiting,
+  movePlayerTeam,
+  removePlayer,
   restartMatch,
+  restoreSeat,
   setDeck,
   setTeam,
   setTwists,
@@ -17,13 +21,25 @@ import type { DeckMode, Team, Twist } from "@/types/game";
 
 export const maxDuration = 60;
 
-type Action = "team" | "deck" | "twists" | "draw" | "start" | "restart";
+type Action =
+  | "team"
+  | "deck"
+  | "twists"
+  | "draw"
+  | "start"
+  | "restart"
+  | "approve"
+  | "restore"
+  | "remove"
+  | "move";
 
 interface Body {
   code?: string;
   token?: string;
   action?: Action;
-  team?: Team;
+  team?: Team | null;
+  playerId?: string;
+  targetId?: string;
   deckMode?: DeckMode;
   twists?: Twist[];
   stealEnabled?: boolean;
@@ -67,6 +83,26 @@ export async function POST(request: Request) {
 
     if (payload.action === "restart") {
       await restartMatch(room, me);
+      return { ok: true };
+    }
+
+    if (payload.action === "approve" && payload.playerId && payload.team) {
+      await approveWaiting(room, me, payload.playerId, payload.team);
+      return { ok: true };
+    }
+
+    if (payload.action === "restore" && payload.playerId && payload.targetId) {
+      await restoreSeat(room, me, payload.playerId, payload.targetId);
+      return { ok: true };
+    }
+
+    if (payload.action === "remove" && payload.playerId) {
+      await removePlayer(room, me, payload.playerId);
+      return { ok: true };
+    }
+
+    if (payload.action === "move" && payload.playerId) {
+      await movePlayerTeam(room, me, payload.playerId, payload.team ?? null);
       return { ok: true };
     }
 
